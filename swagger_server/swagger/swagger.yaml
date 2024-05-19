@@ -1,0 +1,426 @@
+---
+swagger: "2.0"
+info:
+  description: "Tool API"
+  version: "0.0.1"
+  title: "Tool API"
+  contact:
+    email: "api@utc"
+  license:
+    name: "Apache 2.0"
+    url: "http://www.apache.org/licenses/LICENSE-2.0.html"
+basePath: "/v1"
+tags:
+- name: "Login"
+  description: "Login"
+- name: "Logout"
+  description: "Logout"
+- name: "Config"
+  description: "Configuration trade"
+- name: "Ping"
+  description: "Ping"
+- name: "Start"
+  description: "Start"
+- name: "Stop"
+  description: "Stop"
+schemes:
+- "http"
+consumes:
+- "application/json"
+produces:
+- "application/json"
+paths:
+  /login:
+    post:
+      tags:
+      - "Login"
+      summary: "Login post"
+      description: "Do login"
+      operationId: "login_post"
+      parameters:
+      - in: "body"
+        name: "Login"
+        description: "Parameter Login"
+        required: true
+        schema:
+          $ref: "#/definitions/LoginRequest"
+      responses:
+        "200":
+          description: "Success"
+          schema:
+            $ref: "#/definitions/LoginResponse"
+        default:
+          description: "HTTP error code response.\n200=Success\n400=Invalid parameter\n\
+            401=Authentication error\n404=Not found error\n...\nBody is error detail"
+          schema:
+            $ref: "#/definitions/CommonResponse"
+      x-swagger-router-controller: "swagger_server.controllers.login_controller"
+  /logout:
+    post:
+      tags:
+      - "Logout"
+      summary: "Logout post"
+      description: "Do logout"
+      operationId: "logout_post"
+      parameters: []
+      responses:
+        default:
+          description: "HTTP error code response.\n200=Success\n400=Invalid parameter\n\
+            401=Authentication error\n404=Not found error\n...\nBody is error detail"
+          schema:
+            $ref: "#/definitions/CommonResponse"
+      x-swagger-router-controller: "swagger_server.controllers.logout_controller"
+  /config:
+    post:
+      tags:
+      - "Config"
+      summary: "Configuration trade post"
+      description: "Do Configuration trade"
+      operationId: "config_post"
+      parameters:
+      - in: "body"
+        name: "Config"
+        description: "Parameter Configuration trade"
+        required: true
+        schema:
+          $ref: "#/definitions/ConfigureTradeRequest"
+      responses:
+        "200":
+          description: "Success"
+          schema:
+            $ref: "#/definitions/CommonResponse"
+        default:
+          description: "HTTP error code response.\n200=Success\n400=Invalid parameter\n\
+            401=Authentication error\n404=Not found error\n...\nBody is error detail"
+          schema:
+            $ref: "#/definitions/CommonResponse"
+      x-swagger-router-controller: "swagger_server.controllers.config_controller"
+  /start:
+    post:
+      tags:
+      - "Start"
+      summary: "Start trade post"
+      description: "Do Start trade"
+      operationId: "start_post"
+      parameters: []
+      responses:
+        "200":
+          description: "Success"
+          schema:
+            $ref: "#/definitions/CommonResponse"
+        default:
+          description: "HTTP error code response.\n200=Success\n400=Invalid parameter\n\
+            401=Authentication error\n404=Not found error\n...\nBody is error detail"
+          schema:
+            $ref: "#/definitions/CommonResponse"
+      x-swagger-router-controller: "swagger_server.controllers.start_controller"
+  /stop:
+    post:
+      tags:
+      - "Stop"
+      summary: "Stop trade post"
+      description: "Do Stop trade"
+      operationId: "stop_post"
+      parameters: []
+      responses:
+        "200":
+          description: "Success"
+          schema:
+            $ref: "#/definitions/CommonResponse"
+        default:
+          description: "HTTP error code response.\n200=Success\n400=Invalid parameter\n\
+            401=Authentication error\n404=Not found error\n...\nBody is error detail"
+          schema:
+            $ref: "#/definitions/CommonResponse"
+      x-swagger-router-controller: "swagger_server.controllers.stop_controller"
+  /ping:
+    post:
+      tags:
+      - "Ping"
+      summary: "Start trade post"
+      description: "Do Start trade"
+      operationId: "ping_post"
+      parameters: []
+      responses:
+        "200":
+          description: "Success"
+          schema:
+            $ref: "#/definitions/PingResponse"
+        default:
+          description: "HTTP error code response.\n200=Success\n400=Invalid parameter\n\
+            401=Authentication error\n404=Not found error\n...\nBody is error detail"
+          schema:
+            $ref: "#/definitions/CommonResponse"
+      x-swagger-router-controller: "swagger_server.controllers.ping_controller"
+definitions:
+  LoginRequest:
+    type: "object"
+    properties:
+      login_id:
+        type: "integer"
+        format: "int32"
+        description: "Login ID"
+      password:
+        type: "string"
+        description: "Password"
+    example:
+      login_id: 9999
+      password: "111"
+  ConfigureTradeRequest:
+    type: "object"
+    properties:
+      coin:
+        type: "string"
+        description: "coin trade"
+      primary_exchange:
+        description: "Exchange primary"
+        $ref: "#/definitions/ExchangeRequest"
+      secondary_exchange:
+        description: "Exchange secondary"
+        $ref: "#/definitions/ExchangeRequest"
+      limit:
+        type: "integer"
+        format: "int32"
+        description: "Litmit"
+      simulated:
+        type: "integer"
+        format: "int32"
+        description: "simulated"
+    example:
+      primary_exchange:
+        code: "okx"
+        private_key: "abc"
+      simulated: 6
+      limit: 0
+      secondary_exchange:
+        code: "okx"
+        private_key: "abc"
+      coin: "coin"
+  CoinsRequest:
+    type: "object"
+    properties:
+      exchange_code:
+        type: "string"
+        description: "exchange code"
+    example:
+      exchange_code: "exchange_code"
+  CoinsResponse:
+    type: "object"
+    properties:
+      coin_list:
+        type: "array"
+        items:
+          $ref: "#/definitions/CoinInfo"
+    example:
+      coin_list:
+      - symbol: "symbol"
+        base: "base"
+      - symbol: "symbol"
+        base: "base"
+  ExchangesResponse:
+    type: "object"
+    properties:
+      coin_list:
+        type: "array"
+        items:
+          type: "string"
+          description: "exchange code"
+    example:
+      coin_list:
+      - "coin_list"
+      - "coin_list"
+  CoinInfo:
+    type: "object"
+    properties:
+      symbol:
+        type: "string"
+        description: "coin symbol"
+      base:
+        type: "string"
+        description: "coin base"
+    example:
+      symbol: "symbol"
+      base: "base"
+  PingResponse:
+    type: "object"
+    properties:
+      coin:
+        type: "string"
+        description: "coin trade"
+      primary_exchange:
+        description: "Exchange primary"
+        $ref: "#/definitions/ExchangePingInfo"
+      secondary_exchange:
+        description: "Exchange secondary"
+        $ref: "#/definitions/ExchangePingInfo"
+      limit:
+        type: "integer"
+        format: "int32"
+        description: "Litmit"
+      simulated:
+        type: "integer"
+        format: "int32"
+        description: "simulated"
+    example:
+      login_id: 9999
+      password: "111"
+      device_id: 1
+      application_id: 1
+  ExchangeRequest:
+    type: "object"
+    properties:
+      exchange_code:
+        type: "string"
+        description: "Exchange code"
+      private_key:
+        type: "string"
+        description: "primary key"
+      secret_key:
+        type: "string"
+        description: "secret key"
+      password:
+        type: "string"
+        description: "password"
+    example:
+      code: "okx"
+      private_key: "abc"
+  ExchangeInfo:
+    type: "object"
+    properties:
+      code:
+        type: "string"
+        description: "Exchange code"
+      coin_list:
+        type: "array"
+        items:
+          $ref: "#/definitions/CoinTradeInfo"
+      amount_usdt:
+        type: "integer"
+        format: "long"
+        description: "Usdt"
+    example:
+      code: "okx"
+      private_key: "abc"
+  ExchangePingInfo:
+    type: "object"
+    properties:
+      code:
+        type: "string"
+        description: "Exchange code"
+      item_list:
+        type: "array"
+        items:
+          $ref: "#/definitions/BalanceInfo"
+    example:
+      code: "okx"
+      private_key: "abc"
+  BalanceInfo:
+    type: "object"
+    properties:
+      coin:
+        type: "string"
+        description: "Coin code"
+      amount:
+        type: "integer"
+        format: "long"
+    example:
+      code: "okx"
+      private_key: "abc"
+  LoginResponse:
+    type: "object"
+    properties:
+      secret_key:
+        type: "string"
+        example: "xxxxxxxxxxxx"
+        description: "Token secret key"
+      user_info:
+        $ref: "#/definitions/UserInfo"
+      access_info:
+        type: "array"
+        items:
+          $ref: "#/definitions/AccessInfo"
+    example:
+      secret_key: "xxxxxxxxxxxx"
+      user_info:
+        login_id: 0
+        user_name: "user_name"
+      access_info:
+      - default: 6
+        name: "name"
+        active: 0
+      - default: 6
+        name: "name"
+        active: 0
+  UserInfo:
+    type: "object"
+    properties:
+      login_id:
+        type: "integer"
+        format: "int32"
+        description: "Login id"
+      user_name:
+        type: "string"
+        description: "User name"
+    example:
+      login_id: 0
+      user_name: "user_name"
+  CoinTradeInfo:
+    type: "object"
+    properties:
+      coin:
+        type: "string"
+        description: "Coin"
+      amount:
+        type: "string"
+        description: "User name"
+      price:
+        type: "integer"
+        description: "long"
+  AccessInfo:
+    type: "object"
+    properties:
+      name:
+        type: "string"
+        description: "Access menu name"
+      active:
+        type: "integer"
+        format: "int32"
+        description: "0: disable, 1: enable"
+      default:
+        type: "integer"
+        format: "int32"
+        description: "0: no default, 1: default page"
+    example:
+      default: 6
+      name: "name"
+      active: 0
+  CommonResponse:
+    type: "object"
+    properties:
+      code:
+        type: "string"
+        example: "OK"
+        description: "Result"
+        enum:
+        - "OK"
+        - "NG"
+      message:
+        type: "string"
+        example: "Success message"
+        description: "Addition message"
+      info:
+        type: "array"
+        items:
+          type: "string"
+    example:
+      code: "OK"
+      message: "Success message"
+      info:
+      - "info"
+      - "info"
+responses:
+  CommonResponse:
+    description: "HTTP error code response.\n200=Success\n400=Invalid parameter\n\
+      401=Authentication error\n404=Not found error\n...\nBody is error detail"
+    schema:
+      $ref: "#/definitions/CommonResponse"
