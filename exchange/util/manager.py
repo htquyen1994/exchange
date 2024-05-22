@@ -1,3 +1,4 @@
+import datetime
 import multiprocessing
 from multiprocessing import Process, Event, Queue
 from time import sleep
@@ -7,6 +8,8 @@ from exchange.util.exchange_thread import ExchangeThread
 import uuid
 import telebot
 from time import gmtime, strftime
+
+from exchange.util.log_agent import LoggerAgent
 
 CHAT_ID = "-4256093220"
 
@@ -18,6 +21,7 @@ class Manager:
     ccxt_manager = None
     shared_ccxt_manager = None
     queue_config = Queue()
+    logger = None
 
     @staticmethod
     def get_instance():
@@ -34,12 +38,13 @@ class Manager:
         self.shared_ccxt_manager = manager.Namespace()
         self.shared_ccxt_manager.instance = CcxtManager.get_instance()
         # self.ccxt_manager = CcxtManager.get_instance()
+        self.logger = LoggerAgent.get_instance()
 
     def get_shared_ccxt_manager(self):
         return self.shared_ccxt_manager
 
     def start_worker(self):
-        self.process = Process(target=self.do_work, args=(self.queue_config, ))
+        self.process = Process(target=self.do_work, args=(self.queue_config, self.logger))
         self.process.start()
 
     def start(self):
@@ -67,8 +72,10 @@ class Manager:
         ccxt.set_configure(primary_exchange, secondary_exchange, coin, limit, simulator)
         self.queue_config.put(ccxt)
 
-    def do_work(self, queue_config):
+    def do_work(self, queue_config, logger):
         bot = telebot.TeleBot("6331463036:AAF5L45My0A17fNI01HrBwQeYWhtnX0ZIzc")
+        current_time = datetime.datetime.now()
+
         while True:
             # __primary_thread = None
             # __secondary_thread = None
@@ -78,7 +85,6 @@ class Manager:
             __pending_queue = None
             initialize = False
             shared_ccxt_manager = None
-
             while self.start_event.is_set():
                 try:
                     if not initialize and not queue_config.empty():
@@ -97,7 +103,6 @@ class Manager:
                     # print("==============Cal:  ", str(__primary_queue.qsize()), str(__secondary_queue.qsize()))
                     # print("Get queue {} / {}".format(__primary_queue.qsize(), __secondary_queue.qsize()))
                     print("=====Execute time main {0}".format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-
                     primary_msg = get_balance(shared_ccxt_manager, True)
                     secondary_msg = get_balance(shared_ccxt_manager, False)
 
@@ -141,8 +146,6 @@ class Manager:
                             ccxt_primary = shared_ccxt_manager.get_ccxt(True)
                             ccxt_secondary = shared_ccxt_manager.get_ccxt(False)
 
-                            # print("Get msg {} / {}".format(secondary_msg, primary_msg))
-
                             if secondary_amount_usdt < 20 or primary_amount_usdt < 20:
 
                                 msg = "Warning exchange {0}/{1}".format(
@@ -154,6 +157,7 @@ class Manager:
                                 msg = msg + "\n USDT {0} / {1}".format(primary_amount_usdt, secondary_amount_usdt)
 
                                 bot.send_message(CHAT_ID, msg)
+                                logger.info(msg)
                                 sleep(5)
                                 continue
 
@@ -165,9 +169,8 @@ class Manager:
                                         primary_amount_usdt,
                                         secondary_amount_usdt) / primary_buy_price, primary_amount_coin,
                                     secondary_amount_coin)
-                                # print("Quantity", quantity)
                                 print("Buy primary and sell secondary", quantity)
-
+                                logger.info("Buy primary and sell secondary: {0}".format(quantity))
                                 primary_order = ccxt_primary.create_limit_sell_order(coin_trade,
                                                                                      quantity,
                                                                                      primary_buy_price)
@@ -185,7 +188,7 @@ class Manager:
                                         primary_amount_usdt) / secondary_buy_price, secondary_amount_coin,
                                     primary_amount_coin)
                                 print("Sell primary and buy secondary", quantity)
-
+                                logger.info("Sell primary and buy secondary: {0}".format(quantity))
                                 primary_order = ccxt_primary.create_limit_buy_order(coin_trade,
                                                                                     quantity,
                                                                                     primary_sell_price)
@@ -193,35 +196,53 @@ class Manager:
                                                                                          quantity,
                                                                                          secondary_buy_price)
 
-                                # msg = "Pending sell primary and buy secondary\n"
-                                # msg = msg + "COIN: ".format(coin_trade)
-                                # msg = msg + "\nQUANTITY: ".format(quantity)
-                                # msg = msg + "\nPRICE: {0} / {1}".format(primary_sell_price)
-                                # bot.send_message(CHAT_ID, msg)
-
                                 __pending_queue.put({'is_primary': True, 'order_id': primary_order['id']})
                                 __pending_queue.put({'is_primary': False, 'order_id': secondary_order['id']})
                             else:
                                 sleep(0.1)
                                 print("Waiting...")
+                                logger.info("Waiting...")
+                                if (datetime.datetime.now() - current_time).total_seconds() >= 60:
+                                    bot.send_message(CHAT_ID, "Trading status is waiting - not match")
+                                    current_time = datetime.datetime.now()
                         except Exception as ex:
                             print("Error manager:  {}".format(ex))
+                            logger.info("Error manager 1: {0}".format(ex))
+                            if (datetime.datetime.now() - current_time).total_seconds() >= 60:
+                                bot.send_message(CHAT_ID, "Error manager line")
+                                current_time = datetime.datetime.now()
                     else:
                         sleep(0.2)
                 except Exception as ex:
                     print("Error:  {}".format(ex))
+                    logger.info("Error manager 2: {0}".format(ex))
+
+                    try:
+                        if (datetime.datetime.now() - current_time).total_seconds() >= 300:
+                            bot.send_message(CHAT_ID, "Error manager")
+                            current_time = datetime.datetime.now()
+                    except Exception as ex:
+                        logger.info("Send chat box error".format(ex))
 
             if not self.start_event.is_set():
-                # print("Stop threads child")
-                # if __primary_thread is not None:
-                #     __primary_thread.stop_job()
-                # if __secondary_thread is not None:
-                #     __secondary_thread.stop_job()
                 if __pending_thread is not None:
                     __pending_thread.stop_job()
+                try:
+                    if (datetime.datetime.now() - current_time).total_seconds() >= 60:
+                        bot.send_message(CHAT_ID, "Trading is not start")
+                        current_time = datetime.datetime.now()
+                except Exception as ex:
+                    logger.info("Send chat box error".format(ex))
 
             sleep(0.5)
             print("Process is stopped")
+            logger.info("Process is running")
+            try:
+                if (datetime.datetime.now() - current_time).total_seconds() >= 60:
+                    bot.send_message(CHAT_ID, "Process is stopped")
+                    current_time = datetime.datetime.now()
+            except Exception as ex:
+                logger.info("Send chat box error".format(ex))
 
 
 def get_latest_queue(q):

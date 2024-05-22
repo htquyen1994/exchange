@@ -41,7 +41,6 @@ class ExchangePendingThread:
     def job_function(self, q, shared_ccxt_manager):
         while self.is_running:
             try:
-                # print("=====Execute pending query {0}".format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
                 if not q.empty():
                     sleep(2)
                     symbol = shared_ccxt_manager.get_coin_trade()
@@ -49,7 +48,6 @@ class ExchangePendingThread:
                     order_transaction = q.get()
                     order_id = order_transaction.order_id
                     exchange = shared_ccxt_manager.instance.get_ccxt(order_transaction.is_primary)
-                    # print("Pending thread {0}".format(order_transaction))
                     if exchange and order_id:
                         order_status = exchange.fetch_order(order_id, symbol)
                         if order_status['status'] == 'closed':
@@ -59,9 +57,11 @@ class ExchangePendingThread:
 
                         elif order_status['status'] == 'open':
                             result = exchange.cancel_order(order_id, symbol)
-                            print("Lệnh đã được hủy thành công: ", result)
+                            msg = "Command cancel: \n {0}".format(order_status)
+                            self.bot.send_message(CHAT_ID, msg)
                         else:
-                            print("Lệnh không thành công hoặc đã bị hủy.")
+                            msg = "Command failed or cancel: \n {0}".format(order_status)
+                            self.bot.send_message(CHAT_ID, msg)
                 else:
                     sleep(2)
             except Exception as ex:

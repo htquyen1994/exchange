@@ -1,4 +1,5 @@
 import multiprocessing
+import os
 from logging.handlers import RotatingFileHandler
 from multiprocessing import Process, Queue, queues
 import logging
@@ -8,9 +9,11 @@ from config.config import LogSetting, Message
 
 
 def initialize():
-    full_path = LogSetting.LOG_FILE
-    logger = logging.getLogger(full_path)
-    handler = RotatingFileHandler(full_path, maxBytes=100 * 1024 * 1024,
+    project_root_directory = os.getcwd()
+    log_file_path = os.path.join(project_root_directory, "logs", "app.log")
+
+    logger = logging.getLogger(log_file_path)
+    handler = RotatingFileHandler(log_file_path, maxBytes=100 * 1024 * 1024,
                                   backupCount=2)
     formatter = logging.Formatter('%(asctime)s: %(message)s')
     handler.setFormatter(formatter)
@@ -23,7 +26,9 @@ def initialize():
 class LoggerAgent(queues.Queue):
     # Initialization flag
     # Log file path
-    full_path = LogSetting.LOG_FILE
+    project_root_directory = os.getcwd()
+    log_file_path = os.path.join(project_root_directory, "logs", "app.log")
+    full_path = log_file_path
     # Log object
     logger = None
     # Process worker
