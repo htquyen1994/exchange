@@ -202,15 +202,16 @@ class Manager:
                                 sleep(0.1)
                                 print("Waiting...")
                                 logger.info("Waiting...")
-                                if (datetime.datetime.now() - current_time).total_seconds() >= 60:
+                                if (datetime.datetime.now() - current_time).total_seconds() >= 300:
                                     bot.send_message(CHAT_ID, "Trading status is waiting - not match")
                                     current_time = datetime.datetime.now()
                         except Exception as ex:
                             print("Error manager:  {}".format(ex))
                             logger.info("Error manager 1: {0}".format(ex))
-                            if (datetime.datetime.now() - current_time).total_seconds() >= 60:
-                                bot.send_message(CHAT_ID, "Error manager line")
-                                current_time = datetime.datetime.now()
+                            try:
+                                if (datetime.datetime.now() - current_time).total_seconds() >= 300:
+                                    bot.send_message(CHAT_ID, "Error manager")
+                                    current_time = datetime.datetime.now()
                     else:
                         sleep(0.2)
                 except Exception as ex:
@@ -228,7 +229,7 @@ class Manager:
                 if __pending_thread is not None:
                     __pending_thread.stop_job()
                 try:
-                    if (datetime.datetime.now() - current_time).total_seconds() >= 60:
+                    if (datetime.datetime.now() - current_time).total_seconds() >= 300:
                         bot.send_message(CHAT_ID, "Trading is not start")
                         current_time = datetime.datetime.now()
                 except Exception as ex:
@@ -238,7 +239,7 @@ class Manager:
             print("Process is stopped")
             logger.info("Process is running")
             try:
-                if (datetime.datetime.now() - current_time).total_seconds() >= 60:
+                if (datetime.datetime.now() - current_time).total_seconds() >= 300:
                     bot.send_message(CHAT_ID, "Process is stopped")
                     current_time = datetime.datetime.now()
             except Exception as ex:
