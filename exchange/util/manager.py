@@ -212,15 +212,16 @@ class Manager:
                                 bot.send_message(CHAT_ID, "Error manager line")
                                 current_time = datetime.datetime.now()
                     else:
-                        sleep(0.2)
+                        sleep(0.5)
                 except Exception as ex:
                     print("Error:  {}".format(ex))
                     logger.info("Error manager 2: {0}".format(ex))
-
                     try:
                         if (datetime.datetime.now() - current_time).total_seconds() >= 300:
                             bot.send_message(CHAT_ID, "Error manager")
                             current_time = datetime.datetime.now()
+                        else:
+                            sleep(1)
                     except Exception as ex:
                         logger.info("Send chat box error".format(ex))
 
@@ -233,7 +234,6 @@ class Manager:
                         current_time = datetime.datetime.now()
                 except Exception as ex:
                     logger.info("Send chat box error".format(ex))
-
             sleep(0.5)
             print("Process is stopped")
             logger.info("Process is running")
