@@ -212,6 +212,8 @@ class Manager:
                                 if (datetime.datetime.now() - current_time).total_seconds() >= 300:
                                     bot.send_message(CHAT_ID, "Error manager")
                                     current_time = datetime.datetime.now()
+                            except Exception as ex:
+                                print("Error:  {}".format(ex))
                     else:
                         sleep(0.5)
                 except Exception as ex:
