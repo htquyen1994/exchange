@@ -21,6 +21,7 @@ def init_cctx_exchange(exchange):
     elif exchange_code == ExchangesCode.KUCOIN.value:
         ccxt_exchange = ccxt.kucoin(param)
     elif exchange_code == ExchangesCode.BITGET.value:
+        param['password'] = exchange.password
         ccxt_exchange = ccxt.bitget(param)
     elif exchange_code == ExchangesCode.MEXC.value:
         ccxt_exchange = ccxt.mexc(param)

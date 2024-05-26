@@ -79,10 +79,10 @@ class Manager:
         while True:
             # __primary_thread = None
             # __secondary_thread = None
-            __pending_thread = None
+            # __pending_thread = None
             # __primary_queue = None
             # __secondary_queue = None
-            __pending_queue = None
+            # __pending_queue = None
             initialize = False
             shared_ccxt_manager = None
             while self.start_event.is_set():
@@ -91,17 +91,15 @@ class Manager:
                         shared_ccxt_manager = queue_config.get()
                         # __primary_queue = Queue(maxsize=1)
                         # __secondary_queue = Queue(maxsize=1)
-                        __pending_queue = Queue()
+                        # __pending_queue = Queue()
                         # __primary_thread = ExchangeThread(__primary_queue, True)
                         # __secondary_thread = ExchangeThread(__secondary_queue, False)
-                        __pending_thread = ExchangePendingThread(__pending_queue)
+                        # __pending_thread = ExchangePendingThread(__pending_queue)
 
                         # __secondary_thread.start_job(shared_ccxt_manager)
                         # __primary_thread.start_job(shared_ccxt_manager)
-                        __pending_thread.start_job(shared_ccxt_manager)
+                        # __pending_thread.start_job(shared_ccxt_manager)
                         initialize = True
-                    # print("==============Cal:  ", str(__primary_queue.qsize()), str(__secondary_queue.qsize()))
-                    # print("Get queue {} / {}".format(__primary_queue.qsize(), __secondary_queue.qsize()))
                     print("=====Execute time main {0}".format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
                     primary_msg = get_balance(shared_ccxt_manager, True)
                     secondary_msg = get_balance(shared_ccxt_manager, False)
@@ -158,6 +156,15 @@ class Manager:
 
                                 bot.send_message(CHAT_ID, msg)
                                 logger.info(msg)
+
+                                send_bot_message_coin(bot,
+                                                      logger,
+                                                      shared_ccxt_manager,
+                                                      "Warning exchange",
+                                                      primary_amount_coin,
+                                                      secondary_amount_coin,
+                                                      primary_amount_usdt,
+                                                      secondary_amount_usdt)
                                 sleep(5)
                                 continue
 
@@ -169,17 +176,32 @@ class Manager:
                                         primary_amount_usdt,
                                         secondary_amount_usdt) / primary_buy_price, primary_amount_coin,
                                     secondary_amount_coin)
-                                print("Buy primary and sell secondary", quantity)
-                                logger.info("Buy primary and sell secondary: {0}".format(quantity))
-                                primary_order = ccxt_primary.create_limit_sell_order(coin_trade,
-                                                                                     quantity,
-                                                                                     primary_buy_price)
-                                secondary_order = ccxt_secondary.create_limit_buy_order(coin_trade,
-                                                                                        quantity,
-                                                                                        secondary_sell_price)
-                                __pending_queue.put({'is_primary': True, 'order_id': primary_order['id']})
-                                __pending_queue.put({'is_primary': False, 'order_id': secondary_order['id']})
+                                precision_invalid = (quantity * primary_buy_price) < 5 or (
+                                            quantity * secondary_sell_price) < 5
+                                if precision_invalid:
+                                    msg = "======PRECISION PRICE======\n"
+                                    msg = msg + "USDT {0}/{1}\n".format(primary_amount_usdt, secondary_amount_usdt)
+                                    msg = msg + "COIN {0}/{1}\n".format(primary_amount_coin, secondary_amount_coin)
+                                    msg = msg + "quantity: {0}\n".format(quantity)
+                                    msg = msg + "Price buy: {0} => {1}\n".format(primary_buy_price,
+                                                                                 quantity * primary_buy_price)
+                                    msg = msg + "Second sell: {0} => {1}\n".format(secondary_sell_price,
+                                                                                   quantity * primary_buy_price)
+                                    bot.send_message(CHAT_ID, msg)
+                                else:
+                                    print("Buy primary and sell secondary", quantity)
+                                    logger.info("Buy primary and sell secondary: {0}".format(quantity))
+                                    primary_order = ccxt_primary.create_limit_sell_order(coin_trade,
+                                                                                         quantity,
+                                                                                         primary_buy_price)
+                                    secondary_order = ccxt_secondary.create_limit_buy_order(coin_trade,
+                                                                                            quantity,
+                                                                                            secondary_sell_price)
 
+                                    handle_exchange_order_transaction(logger, bot,
+                                                                      ccxt_primary, ccxt_secondary,
+                                                                      primary_order['id'], secondary_order['id'],
+                                                                      coin_trade)
                             elif secondary_buy_price > 1.006 * primary_sell_price:
                                 quantity = min(
                                     min(secondary_buy_price * secondary_buy_quantity,
@@ -187,22 +209,37 @@ class Manager:
                                         secondary_amount_usdt,
                                         primary_amount_usdt) / secondary_buy_price, secondary_amount_coin,
                                     primary_amount_coin)
-                                print("Sell primary and buy secondary", quantity)
-                                logger.info("Sell primary and buy secondary: {0}".format(quantity))
-                                primary_order = ccxt_primary.create_limit_buy_order(coin_trade,
-                                                                                    quantity,
-                                                                                    primary_sell_price)
-                                secondary_order = ccxt_secondary.create_limit_sell_order(coin_trade,
-                                                                                         quantity,
-                                                                                         secondary_buy_price)
 
-                                __pending_queue.put({'is_primary': True, 'order_id': primary_order['id']})
-                                __pending_queue.put({'is_primary': False, 'order_id': secondary_order['id']})
+                                precision_invalid = (quantity * secondary_buy_price) < 5 or (
+                                            quantity * primary_sell_price) < 5
+                                if precision_invalid:
+                                    msg = "======PRECISION PRICE======\n"
+                                    msg = msg + "quantity: {0}\n".format(quantity)
+                                    msg = msg + "USDT {0}/{1}\n".format(primary_amount_usdt, secondary_amount_usdt)
+                                    msg = msg + "COIN {0}/{1}\n".format(primary_amount_coin, secondary_amount_coin)
+                                    msg = msg + "Price sell: {0} => {1}\n".format(primary_sell_price,
+                                                                                  quantity * primary_sell_price)
+                                    msg = msg + "Second buy: {0} => {1}\n".format(secondary_buy_price,
+                                                                                  quantity * secondary_buy_price)
+                                    bot.send_message(CHAT_ID, msg)
+                                else:
+                                    print("Sell primary and buy secondary", quantity)
+                                    logger.info("Sell primary and buy secondary: {0}".format(quantity))
+                                    primary_order = ccxt_primary.create_limit_buy_order(coin_trade,
+                                                                                        quantity,
+                                                                                        primary_sell_price)
+                                    secondary_order = ccxt_secondary.create_limit_sell_order(coin_trade,
+                                                                                             quantity,
+                                                                                             secondary_buy_price)
+
+                                    handle_exchange_order_transaction(logger, bot,
+                                                                      ccxt_primary, ccxt_secondary,
+                                                                      primary_order['id'], secondary_order['id'],
+                                                                      coin_trade)
                             else:
                                 sleep(0.1)
                                 print("Waiting...")
-                                logger.info("Waiting...")
-                                if (datetime.datetime.now() - current_time).total_seconds() >= 300:
+                                if (datetime.datetime.now() - current_time).total_seconds() >= 600:
                                     bot.send_message(CHAT_ID, "Trading status is waiting - not match")
                                     current_time = datetime.datetime.now()
                         except Exception as ex:
@@ -229,15 +266,13 @@ class Manager:
                         logger.info("Send chat box error".format(ex))
 
             if not self.start_event.is_set():
-                if __pending_thread is not None:
-                    __pending_thread.stop_job()
                 try:
                     if (datetime.datetime.now() - current_time).total_seconds() >= 300:
                         bot.send_message(CHAT_ID, "Trading is not start")
                         current_time = datetime.datetime.now()
                 except Exception as ex:
                     logger.info("Send chat box error".format(ex))
-            sleep(0.5)
+            sleep(1)
             print("Process is stopped")
             logger.info("Process is running")
             try:
@@ -271,9 +306,49 @@ def get_balance(shared_ccxt_manager, is_primary):
                 param_object['balance']['amount_usdt'] = float(amount)
             if currency == coin.split('/')[0]:
                 param_object['balance']['amount_coin'] = float(amount)
-
-        # if shared_ccxt_manager.get_simulator() == 1:
-        #     param_object['balance']['amount_usdt'] = 250
-        #     param_object['balance']['amount_coin'] = 250
         return param_object
     return None
+
+
+def handle_exchange_order_transaction(logger, bot, exchange_primary, exchange_secondary,
+                                      primary_order_id, secondary_order_id,
+                                      symbol):
+    count = 0
+    while count < 2:
+        count = count + 1
+        sleep(1)
+        try:
+            primary_order_status = exchange_primary.fetch_order(primary_order_id, symbol)
+            secondary_order_status = exchange_secondary.fetch_order(secondary_order_id, symbol)
+            print("Order status {0} / {1} ".format(primary_order_status['status'], secondary_order_status['status']))
+            if primary_order_status['status'] == 'closed' and secondary_order_status['status'] == 'closed':
+                bot.send_message(CHAT_ID, "Buy sell success")
+                count = count + 1
+                continue
+            elif count == 2:
+                if primary_order_status['status'] == 'open':
+                    result = exchange_primary.cancel_order(primary_order_id, symbol)
+                    msg = "Command cancel: \n {0}".format(result)
+                    bot.send_message(CHAT_ID, msg)
+
+                if secondary_order_status['status'] == 'open':
+                    result = exchange_secondary.cancel_order(secondary_order_id, symbol)
+                    msg = "Command cancel: \n {0}".format(result)
+                    bot.send_message(CHAT_ID, msg)
+        except Exception as err:
+            logger.info("handle_exchange_order_transaction".format(err))
+
+
+def send_bot_message_coin(bot, logger, shared_ccxt_manager, heading_title,
+                          primary_amount_coin, secondary_amount_coin,
+                          primary_amount_usdt, secondary_amount_usdt):
+    msg = "{0}} {1}/{2}".format(
+        heading_title,
+        shared_ccxt_manager.get_exchange(False).exchange_code,
+        shared_ccxt_manager.get_exchange(True).exchange_code
+    )
+
+    msg = msg + "\n COIN {0} / {1}".format(primary_amount_coin, secondary_amount_coin)
+    msg = msg + "\n USDT {0} / {1}".format(primary_amount_usdt, secondary_amount_usdt)
+    bot.send_message(CHAT_ID, msg)
+    logger.info(msg)
