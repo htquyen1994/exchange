@@ -328,12 +328,12 @@ def handle_exchange_order_transaction(logger, bot, exchange_primary, exchange_se
             elif count == 2:
                 if primary_order_status['status'] == 'open':
                     result = exchange_primary.cancel_order(primary_order_id, symbol)
-                    msg = "Command cancel: \n {0}".format(result)
+                    msg = "Command cancel buy/sell"
                     bot.send_message(CHAT_ID, msg)
 
                 if secondary_order_status['status'] == 'open':
                     result = exchange_secondary.cancel_order(secondary_order_id, symbol)
-                    msg = "Command cancel: \n {0}".format(result)
+                    msg = "Command cancel buy/sell"
                     bot.send_message(CHAT_ID, msg)
         except Exception as err:
             logger.info("handle_exchange_order_transaction".format(err))
