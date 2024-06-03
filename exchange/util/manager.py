@@ -11,7 +11,7 @@ from time import gmtime, strftime
 
 from exchange.util.log_agent import LoggerAgent
 
-CHAT_ID = "-4256093220"
+CHAT_ID = "-4262576067"
 
 
 class Manager:
@@ -73,7 +73,7 @@ class Manager:
         self.queue_config.put(ccxt)
 
     def do_work(self, queue_config, logger):
-        bot = telebot.TeleBot("6331463036:AAF5L45My0A17fNI01HrBwQeYWhtnX0ZIzc")
+        bot = telebot.TeleBot("6508394630:AAGioVntFAwjr5a3lMZW_Jpx2vaOaNo_PLI")
         current_time = datetime.datetime.now()
 
         while True:
@@ -215,8 +215,8 @@ class Manager:
                                 if precision_invalid:
                                     msg = "======PRECISION PRICE======\n"
                                     msg = msg + "quantity: {0}\n".format(quantity)
-                                    msg = msg + "USDT {0}/{1}\n".format(primary_amount_usdt, secondary_amount_usdt)
-                                    msg = msg + "COIN {0}/{1}\n".format(primary_amount_coin, secondary_amount_coin)
+                                    msg = msg + "USDT {0}/{1}\n".format(primary_amount_usdt, secondary_amount_usdt, (primary_amount_usdt + secondary_amount_usdt))
+                                    msg = msg + "COIN {0}/{1}\n".format(primary_amount_coin, secondary_amount_coin, (primary_amount_coin + secondary_amount_coin))
                                     msg = msg + "Price sell: {0} => {1}\n".format(primary_sell_price,
                                                                                   quantity * primary_sell_price)
                                     msg = msg + "Second buy: {0} => {1}\n".format(secondary_buy_price,
@@ -323,17 +323,17 @@ def handle_exchange_order_transaction(logger, bot, exchange_primary, exchange_se
             print("Order status {0} / {1} ".format(primary_order_status['status'], secondary_order_status['status']))
             if primary_order_status['status'] == 'closed' and secondary_order_status['status'] == 'closed':
                 bot.send_message(CHAT_ID, "Buy sell success")
-                count = count + 1
-                continue
-            elif count == 2:
+                # count = count + 1
+                # continue
+            else:
                 if primary_order_status['status'] == 'open':
                     result = exchange_primary.cancel_order(primary_order_id, symbol)
-                    msg = "Command cancel buy/sell"
+                    msg = "Command cancel buy/sell at primary"
                     bot.send_message(CHAT_ID, msg)
 
                 if secondary_order_status['status'] == 'open':
                     result = exchange_secondary.cancel_order(secondary_order_id, symbol)
-                    msg = "Command cancel buy/sell"
+                    msg = "Command cancel buy/sell at secondary"
                     bot.send_message(CHAT_ID, msg)
         except Exception as err:
             logger.info("handle_exchange_order_transaction".format(err))
