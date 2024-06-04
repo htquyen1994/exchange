@@ -11,7 +11,7 @@ from time import gmtime, strftime
 
 from exchange.util.log_agent import LoggerAgent
 
-CHAT_ID = "-4262576067"
+CHAT_ID = "-"
 
 
 class Manager:
@@ -73,7 +73,7 @@ class Manager:
         self.queue_config.put(ccxt)
 
     def do_work(self, queue_config, logger):
-        bot = telebot.TeleBot("6508394630:AAGioVntFAwjr5a3lMZW_Jpx2vaOaNo_PLI")
+        bot = telebot.TeleBot(":")
         current_time = datetime.datetime.now()
 
         while True:
