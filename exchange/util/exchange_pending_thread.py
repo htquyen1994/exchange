@@ -7,7 +7,7 @@ import telebot
 
 
 initialize = False
-CHAT_ID = "-4256093220"
+CHAT_ID = "-4262576067"
 
 
 class ExchangePendingThread:
@@ -15,19 +15,18 @@ class ExchangePendingThread:
     __is_initialize = False
     __ccxt_manager = None
     __queue = None
-    bot = None
+    bot_tele = None
 
     def __init__(self, queue):
         self.is_running = False
         self.__is_initialize = False
         self.__ccxt_manager = CcxtManager.get_instance()
         self.__queue = queue
-        self.bot = telebot.TeleBot("6331463036:AAF5L45My0A17fNI01HrBwQeYWhtnX0ZIzc")
 
-    def start_job(self, shared_ccxt_manager):
+    def start_job(self, shared_ccxt_manager, bot_tele):
         if not self.is_running:
             self.is_running = True
-            self.thread = Thread(target=self.job_function,  args=(self.__queue, shared_ccxt_manager))
+            self.thread = Thread(target=self.job_function,  args=(self.__queue, shared_ccxt_manager, bot_tele))
             self.thread.start()
             print("------------------ START THREAD (ExchangePendingThread)------------------ ")
         else:
@@ -38,32 +37,57 @@ class ExchangePendingThread:
             self.is_running = False
             self.thread.join()
 
-    def job_function(self, q, shared_ccxt_manager):
+    def job_function(self, q, shared_ccxt_manager, bot_tele):
         while self.is_running:
             try:
                 if not q.empty():
-                    sleep(2)
                     symbol = shared_ccxt_manager.get_coin_trade()
-                    # symbol = coin_trade + "/USDT"
                     order_transaction = q.get()
-                    order_id = order_transaction.order_id
-                    exchange = shared_ccxt_manager.instance.get_ccxt(order_transaction.is_primary)
-                    if exchange and order_id:
-                        order_status = exchange.fetch_order(order_id, symbol)
-                        if order_status['status'] == 'closed':
-                            print("===> Lệnh đã được thực hiện thành công: ", order_status)
-                            msg = "Command success: \n {0}".format(order_status)
-                            self.bot.send_message(CHAT_ID, msg)
+                    primary_transaction = order_transaction['primary']
+                    secondary_transaction = order_transaction['secondary']
+                    primary_ccxt_manager = shared_ccxt_manager.get_ccxt(True)
+                    secondary_ccxt_manager = shared_ccxt_manager.get_ccxt(False)
+                    count = 0
+                    while count < 1:
+                        count = count + 1
+                        sleep(2)
+                        try:
+                            primary_order_status = primary_ccxt_manager.fetch_order(primary_transaction.order_id, symbol)
+                            secondary_order_status = secondary_ccxt_manager.fetch_order(secondary_transaction.order_id, symbol)
+                            if primary_order_status['status'] == 'closed' and secondary_order_status['status'] == 'closed':
+                                profit = abs(round(primary_transaction.total - secondary_transaction.total, 3))
+                                bot_tele.send_message(CHAT_ID, "Buy sell success: {0}".format(profit))
+                            else:
+                                if primary_order_status['status'] == 'open' or primary_order_status is None:
+                                    result = primary_ccxt_manager.cancel_order(primary_transaction.order_id, symbol)
+                                    msg = "Canceled primary {0}".format(primary_transaction.total)
+                                    bot_tele.send_message(CHAT_ID, msg)
 
-                        elif order_status['status'] == 'open':
-                            result = exchange.cancel_order(order_id, symbol)
-                            msg = "Command cancel: \n {0}".format(order_status)
-                            self.bot.send_message(CHAT_ID, msg)
-                        else:
-                            msg = "Command failed or cancel: \n {0}".format(order_status)
-                            self.bot.send_message(CHAT_ID, msg)
+                                if secondary_order_status['status'] == 'open' or secondary_order_status is None:
+                                    result = secondary_ccxt_manager.cancel_order(secondary_transaction.order_id, symbol)
+                                    msg = "Canceled secondary {0}".format(secondary_transaction.total)
+                                    bot_tele.send_message(CHAT_ID, msg)
+                        except Exception as err:
+                            print("Error: {0}".format(err))
+                    # count = 0
+                    # while count < 1:
+                    #     try:
+                    #         sleep(2)
+                    #         count = count + 1
+                    #         order_status = ccxt_manager.fetch_order(order_id, symbol)
+                    #         print("Order status {0}".format(order_status['status']))
+                    #         if order_status['status'] == 'closed':
+                    #             bot_tele.send_message(CHAT_ID, "Success: {0}".format(total))
+                    #         else:
+                    #             if order_status['status'] == 'open':
+                    #                 result = ccxt_manager.cancel_order(order_id, symbol)
+                    #                 msg = "Canceled: {0}".format(total)
+                    #                 bot_tele.send_message(CHAT_ID, msg)
+                    #     except Exception as err:
+                    #         print("Error: {0}".format(err))
                 else:
-                    sleep(2)
+                    sleep(1)
+                    print("Thread cancel order is checking")
             except Exception as ex:
                 sleep(1)
                 print("ExchangePendingThread.job_function::".format(ex.__str__()))
