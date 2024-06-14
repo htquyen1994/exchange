@@ -5,6 +5,7 @@ from exchange.util.trader_agent import TraderAgent
 from swagger_server import app, encoder
 from flask_cors import CORS
 from flask import g
+from pybitget import Client
 
 app.app.json_encoder = encoder.JSONEncoder
 app.add_api('swagger.yaml')

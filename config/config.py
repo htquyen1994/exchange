@@ -37,3 +37,4 @@ class ExchangesCode(Enum):
     KUCOIN = 'kucoin'
     BITGET = 'bitget'
     MEXC = 'mexc'
+    BINGX = 'bingx'

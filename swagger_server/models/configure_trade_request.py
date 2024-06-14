@@ -16,7 +16,7 @@ class ConfigureTradeRequest(Model):
     Do not edit the class manually.
     """
 
-    def __init__(self, coin: str=None, primary_exchange: ExchangeRequest=None, secondary_exchange: ExchangeRequest=None, limit: int=None, simulated: int=None):  # noqa: E501
+    def __init__(self, coin: str=None, primary_exchange: ExchangeRequest=None, secondary_exchange: ExchangeRequest=None, limit: int=None, simulated: int=None, total_usdt: int=None, total_coin: int=None, rotation_coin: int=None, rotation_usdt: int=None):  # noqa: E501
         """ConfigureTradeRequest - a model defined in Swagger
 
         :param coin: The coin of this ConfigureTradeRequest.  # noqa: E501
@@ -29,13 +29,25 @@ class ConfigureTradeRequest(Model):
         :type limit: int
         :param simulated: The simulated of this ConfigureTradeRequest.  # noqa: E501
         :type simulated: int
+        :param total_usdt: The total_usdt of this ConfigureTradeRequest.  # noqa: E501
+        :type total_usdt: int
+        :param total_coin: The total_coin of this ConfigureTradeRequest.  # noqa: E501
+        :type total_coin: int
+        :param rotation_coin: The rotation_coin of this ConfigureTradeRequest.  # noqa: E501
+        :type rotation_coin: int
+        :param rotation_usdt: The rotation_usdt of this ConfigureTradeRequest.  # noqa: E501
+        :type rotation_usdt: int
         """
         self.swagger_types = {
             'coin': str,
             'primary_exchange': ExchangeRequest,
             'secondary_exchange': ExchangeRequest,
             'limit': int,
-            'simulated': int
+            'simulated': int,
+            'total_usdt': int,
+            'total_coin': int,
+            'rotation_coin': int,
+            'rotation_usdt': int
         }
 
         self.attribute_map = {
@@ -43,7 +55,11 @@ class ConfigureTradeRequest(Model):
             'primary_exchange': 'primary_exchange',
             'secondary_exchange': 'secondary_exchange',
             'limit': 'limit',
-            'simulated': 'simulated'
+            'simulated': 'simulated',
+            'total_usdt': 'total_usdt',
+            'total_coin': 'total_coin',
+            'rotation_coin': 'rotation_coin',
+            'rotation_usdt': 'rotation_usdt'
         }
 
         self._coin = coin
@@ -51,6 +67,10 @@ class ConfigureTradeRequest(Model):
         self._secondary_exchange = secondary_exchange
         self._limit = limit
         self._simulated = simulated
+        self._total_usdt = total_usdt
+        self._total_coin = total_coin
+        self._rotation_coin = rotation_coin
+        self._rotation_usdt = rotation_usdt
 
     @classmethod
     def from_dict(cls, dikt) -> 'ConfigureTradeRequest':
@@ -177,3 +197,95 @@ class ConfigureTradeRequest(Model):
         """
 
         self._simulated = simulated
+
+    @property
+    def total_usdt(self) -> int:
+        """Gets the total_usdt of this ConfigureTradeRequest.
+
+        simulated  # noqa: E501
+
+        :return: The total_usdt of this ConfigureTradeRequest.
+        :rtype: int
+        """
+        return self._total_usdt
+
+    @total_usdt.setter
+    def total_usdt(self, total_usdt: int):
+        """Sets the total_usdt of this ConfigureTradeRequest.
+
+        simulated  # noqa: E501
+
+        :param total_usdt: The total_usdt of this ConfigureTradeRequest.
+        :type total_usdt: int
+        """
+
+        self._total_usdt = total_usdt
+
+    @property
+    def total_coin(self) -> int:
+        """Gets the total_coin of this ConfigureTradeRequest.
+
+        simulated  # noqa: E501
+
+        :return: The total_coin of this ConfigureTradeRequest.
+        :rtype: int
+        """
+        return self._total_coin
+
+    @total_coin.setter
+    def total_coin(self, total_coin: int):
+        """Sets the total_coin of this ConfigureTradeRequest.
+
+        simulated  # noqa: E501
+
+        :param total_coin: The total_coin of this ConfigureTradeRequest.
+        :type total_coin: int
+        """
+
+        self._total_coin = total_coin
+
+    @property
+    def rotation_coin(self) -> int:
+        """Gets the rotation_coin of this ConfigureTradeRequest.
+
+        simulated  # noqa: E501
+
+        :return: The rotation_coin of this ConfigureTradeRequest.
+        :rtype: int
+        """
+        return self._rotation_coin
+
+    @rotation_coin.setter
+    def rotation_coin(self, rotation_coin: int):
+        """Sets the rotation_coin of this ConfigureTradeRequest.
+
+        simulated  # noqa: E501
+
+        :param rotation_coin: The rotation_coin of this ConfigureTradeRequest.
+        :type rotation_coin: int
+        """
+
+        self._rotation_coin = rotation_coin
+
+    @property
+    def rotation_usdt(self) -> int:
+        """Gets the rotation_usdt of this ConfigureTradeRequest.
+
+        simulated  # noqa: E501
+
+        :return: The rotation_usdt of this ConfigureTradeRequest.
+        :rtype: int
+        """
+        return self._rotation_usdt
+
+    @rotation_usdt.setter
+    def rotation_usdt(self, rotation_usdt: int):
+        """Sets the rotation_usdt of this ConfigureTradeRequest.
+
+        simulated  # noqa: E501
+
+        :param rotation_usdt: The rotation_usdt of this ConfigureTradeRequest.
+        :type rotation_usdt: int
+        """
+
+        self._rotation_usdt = rotation_usdt

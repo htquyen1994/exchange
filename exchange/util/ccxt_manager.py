@@ -25,6 +25,8 @@ def init_cctx_exchange(exchange):
         ccxt_exchange = ccxt.bitget(param)
     elif exchange_code == ExchangesCode.MEXC.value:
         ccxt_exchange = ccxt.mexc(param)
+    elif exchange_code == ExchangesCode.BINGX.value:
+        ccxt_exchange = ccxt.bingx(param)
     return ccxt_exchange
 
 
@@ -37,6 +39,10 @@ class CcxtManager:
     __coin_trade = None
     __simulator = True
     __limit = 100
+    rotation_usdt = 0.5
+    rotation_coin = 0.5
+    total_coin = 0
+    total_usdt = 0
 
     def __init__(self):
         CcxtManager.__instance = self
@@ -47,12 +53,14 @@ class CcxtManager:
             CcxtManager.__instance = CcxtManager()
         return CcxtManager.__instance
 
-    def set_configure(self, primary_info, secondary_info, coin, limit, simulator):
+    def set_configure(self, primary_info, secondary_info, coin, rotation_coin, rotation_usdt, total_coin, total_usdt):
         self.set_primary_exchange(primary_info)
         self.set_secondary_exchange(secondary_info)
         self.__coin_trade = coin
-        self.__limit = limit
-        self.__simulator = simulator
+        self.rotation_coin = rotation_coin
+        self.rotation_usdt = rotation_usdt
+        self.total_coin = total_coin
+        self.total_usdt = total_usdt
 
     def set_primary_exchange(self, exchange_info):
         self.__primary_exchange = exchange_info

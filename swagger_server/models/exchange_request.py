@@ -15,7 +15,7 @@ class ExchangeRequest(Model):
     Do not edit the class manually.
     """
 
-    def __init__(self, exchange_code: str=None, private_key: str=None, secret_key: str=None, password: str=None):  # noqa: E501
+    def __init__(self, exchange_code: str=None, private_key: str=None, secret_key: str=None, password: str=None, chain_coin: str=None, address_coin: str=None, chain_usdt: str=None, address_usdt: str=None):  # noqa: E501
         """ExchangeRequest - a model defined in Swagger
 
         :param exchange_code: The exchange_code of this ExchangeRequest.  # noqa: E501
@@ -26,25 +26,45 @@ class ExchangeRequest(Model):
         :type secret_key: str
         :param password: The password of this ExchangeRequest.  # noqa: E501
         :type password: str
+        :param chain_coin: The chain_coin of this ExchangeRequest.  # noqa: E501
+        :type chain_coin: str
+        :param address_coin: The address_coin of this ExchangeRequest.  # noqa: E501
+        :type address_coin: str
+        :param chain_usdt: The chain_usdt of this ExchangeRequest.  # noqa: E501
+        :type chain_usdt: str
+        :param address_usdt: The address_usdt of this ExchangeRequest.  # noqa: E501
+        :type address_usdt: str
         """
         self.swagger_types = {
             'exchange_code': str,
             'private_key': str,
             'secret_key': str,
-            'password': str
+            'password': str,
+            'chain_coin': str,
+            'address_coin': str,
+            'chain_usdt': str,
+            'address_usdt': str
         }
 
         self.attribute_map = {
             'exchange_code': 'exchange_code',
             'private_key': 'private_key',
             'secret_key': 'secret_key',
-            'password': 'password'
+            'password': 'password',
+            'chain_coin': 'chain_coin',
+            'address_coin': 'address_coin',
+            'chain_usdt': 'chain_usdt',
+            'address_usdt': 'address_usdt'
         }
 
         self._exchange_code = exchange_code
         self._private_key = private_key
         self._secret_key = secret_key
         self._password = password
+        self._chain_coin = chain_coin
+        self._address_coin = address_coin
+        self._chain_usdt = chain_usdt
+        self._address_usdt = address_usdt
 
     @classmethod
     def from_dict(cls, dikt) -> 'ExchangeRequest':
@@ -148,3 +168,95 @@ class ExchangeRequest(Model):
         """
 
         self._password = password
+
+    @property
+    def chain_coin(self) -> str:
+        """Gets the chain_coin of this ExchangeRequest.
+
+        password  # noqa: E501
+
+        :return: The chain_coin of this ExchangeRequest.
+        :rtype: str
+        """
+        return self._chain_coin
+
+    @chain_coin.setter
+    def chain_coin(self, chain_coin: str):
+        """Sets the chain_coin of this ExchangeRequest.
+
+        password  # noqa: E501
+
+        :param chain_coin: The chain_coin of this ExchangeRequest.
+        :type chain_coin: str
+        """
+
+        self._chain_coin = chain_coin
+
+    @property
+    def address_coin(self) -> str:
+        """Gets the address_coin of this ExchangeRequest.
+
+        password  # noqa: E501
+
+        :return: The address_coin of this ExchangeRequest.
+        :rtype: str
+        """
+        return self._address_coin
+
+    @address_coin.setter
+    def address_coin(self, address_coin: str):
+        """Sets the address_coin of this ExchangeRequest.
+
+        password  # noqa: E501
+
+        :param address_coin: The address_coin of this ExchangeRequest.
+        :type address_coin: str
+        """
+
+        self._address_coin = address_coin
+
+    @property
+    def chain_usdt(self) -> str:
+        """Gets the chain_usdt of this ExchangeRequest.
+
+        password  # noqa: E501
+
+        :return: The chain_usdt of this ExchangeRequest.
+        :rtype: str
+        """
+        return self._chain_usdt
+
+    @chain_usdt.setter
+    def chain_usdt(self, chain_usdt: str):
+        """Sets the chain_usdt of this ExchangeRequest.
+
+        password  # noqa: E501
+
+        :param chain_usdt: The chain_usdt of this ExchangeRequest.
+        :type chain_usdt: str
+        """
+
+        self._chain_usdt = chain_usdt
+
+    @property
+    def address_usdt(self) -> str:
+        """Gets the address_usdt of this ExchangeRequest.
+
+        password  # noqa: E501
+
+        :return: The address_usdt of this ExchangeRequest.
+        :rtype: str
+        """
+        return self._address_usdt
+
+    @address_usdt.setter
+    def address_usdt(self, address_usdt: str):
+        """Sets the address_usdt of this ExchangeRequest.
+
+        password  # noqa: E501
+
+        :param address_usdt: The address_usdt of this ExchangeRequest.
+        :type address_usdt: str
+        """
+
+        self._address_usdt = address_usdt
