@@ -15,6 +15,7 @@ from time import gmtime, strftime
 from exchange.util.log_agent import LoggerAgent
 
 CHAT_ID = "-4262576067"
+CHAT_WARNING_ID = "-4277043865"
 
 
 class Manager:
@@ -149,15 +150,15 @@ class Manager:
                                 msg = msg + "\n COIN {0} / {1}".format(primary_amount_coin, secondary_amount_coin)
                                 msg = msg + "\n USDT {0} / {1}".format(primary_amount_usdt, secondary_amount_usdt)
 
-                                bot.send_message(CHAT_ID, msg)
+                                bot.send_message(CHAT_WARNING_ID, msg)
                                 sleep(5)
-                                send_bot_message_coin(bot,
-                                                      shared_ccxt_manager,
-                                                      "Warning exchange",
-                                                      primary_amount_coin,
-                                                      secondary_amount_coin,
-                                                      primary_amount_usdt,
-                                                      secondary_amount_usdt)
+                                # send_bot_message_coin(bot,
+                                #                       shared_ccxt_manager,
+                                #                       "Warning exchange",
+                                #                       primary_amount_coin,
+                                #                       secondary_amount_coin,
+                                #                       primary_amount_usdt,
+                                #                       secondary_amount_usdt)
                                 continue
                             # ban san primary (gate) bids, mua secondary (bingx): ask
                             if primary_buy_price > 1.006 * secondary_sell_price:
@@ -182,7 +183,12 @@ class Manager:
                                                                                          True)
                                 if cost_group_primary > 1.006 * cost_group_secondary:
                                     primary_order = ccxt_primary.create_market_sell_order(coin_trade, quantity)
-                                    secondary_order = ccxt_secondary.create_market_buy_order(coin_trade, quantity)
+
+                                    if shared_ccxt_manager.get_exchange(False).exchange_code == ExchangesCode.GATE.value:
+                                        # ccxt_secondary['options']['createMarketBuyOrderRequiresPrice'] = False
+                                        secondary_order = ccxt_secondary.create_market_buy_order(coin_trade, cost_group_primary)
+                                    else:
+                                        secondary_order = ccxt_secondary.create_market_buy_order(coin_trade, quantity)
                                     order_mgs_primary = round(cost_group_primary, 2)
                                     order_mgs_secondary = round(cost_group_secondary, 2)
                                     print("1====> Sell primary, buy secondary {0} => {1}".format(cost_group_primary, cost_group_secondary))
@@ -217,7 +223,7 @@ class Manager:
                                                                                      quantity * primary_buy_price)
                                         msg = msg + "Second sell: {0} => {1}\n".format(secondary_sell_price,
                                                                                        quantity * primary_buy_price)
-                                        bot.send_message(CHAT_ID, msg)
+                                        bot.send_message(CHAT_WARNING_ID, msg)
                                     else:
                                         print("Buy primary and sell secondary", quantity)
                                         primary_order = ccxt_primary.create_limit_sell_order(coin_trade,
@@ -259,13 +265,18 @@ class Manager:
                                     primary_amount_coin,
                                     secondary_amount_coin), (min(primary_amount_usdt, secondary_amount_usdt) / primary_sell_price))
                                 # Bán sàn bingx, mua gate cost_group_secondary
-                                cost_group_primary = calc_cost_group_order_by_quantity(primary_msg['order_book'], quantity, True)
-                                cost_group_secondary = calc_cost_group_order_by_quantity(
-                                    secondary_msg['order_book'],
-                                    quantity,
-                                    False)
+                                cost_group_primary = calc_cost_group_order_by_quantity(primary_msg['order_book'],
+                                                                                       quantity,
+                                                                                       True)
+                                cost_group_secondary = calc_cost_group_order_by_quantity(secondary_msg['order_book'],
+                                                                                         quantity,
+                                                                                         False)
                                 if cost_group_secondary > 1.006 * cost_group_primary:
-                                    primary_order = ccxt_primary.create_market_buy_order(coin_trade, quantity)
+                                    if shared_ccxt_manager.get_exchange(True).exchange_code == ExchangesCode.GATE.value:
+                                        # ccxt_primary['options']['createMarketBuyOrderRequiresPrice'] = False
+                                        primary_order = ccxt_primary.create_market_buy_order(coin_trade, cost_group_primary)
+                                    else:
+                                        primary_order = ccxt_primary.create_market_buy_order(coin_trade, quantity)
                                     secondary_order = ccxt_secondary.create_market_sell_order(coin_trade, quantity)
                                     order_mgs_primary = round(cost_group_primary, 2)
                                     order_mgs_secondary = round(cost_group_secondary, 2)
@@ -308,7 +319,7 @@ class Manager:
                                                                                       quantity * primary_sell_price)
                                         msg = msg + "Second buy: {0} => {1}\n".format(secondary_buy_price,
                                                                                       quantity * secondary_buy_price)
-                                        bot.send_message(CHAT_ID, msg)
+                                        bot.send_message(CHAT_WARNING_ID, msg)
                                     else:
                                         print("Sell primary and buy secondary", quantity)
                                         primary_order = ccxt_primary.create_limit_buy_order(coin_trade,
@@ -454,7 +465,7 @@ def send_bot_message_coin(bot, shared_ccxt_manager, heading_title,
 
     msg = msg + "\n COIN {0} / {1}".format(primary_amount_coin, secondary_amount_coin)
     msg = msg + "\n USDT {0} / {1}".format(primary_amount_usdt, secondary_amount_usdt)
-    bot.send_message(CHAT_ID, msg)
+    bot.send_message(CHAT_WARNING_ID, msg)
 
 
 def calc_order_group(order_book):
