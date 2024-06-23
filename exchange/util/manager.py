@@ -14,8 +14,8 @@ from time import gmtime, strftime
 
 from exchange.util.log_agent import LoggerAgent
 
-CHAT_ID = "-4262576067"
-CHAT_WARNING_ID = "-4277043865"
+CHAT_ID = "-4269611597"
+CHAT_WARNING_ID = "-4221462272"
 
 
 class Manager:
@@ -139,9 +139,9 @@ class Manager:
                             coin_trade = shared_ccxt_manager.get_coin_trade()
                             ccxt_primary = shared_ccxt_manager.get_ccxt(True)
                             ccxt_secondary = shared_ccxt_manager.get_ccxt(False)
-                            temp1 = (secondary_amount_coin * secondary_buy_price) < 10
-                            temp2 = (primary_amount_coin * primary_buy_price) < 10
-                            if secondary_amount_usdt < 10 or primary_amount_usdt < 10 or temp1 or temp2:
+                            temp1 = (secondary_amount_coin * secondary_buy_price) < 3
+                            temp2 = (primary_amount_coin * primary_buy_price) < 3
+                            if secondary_amount_usdt < 3 or primary_amount_usdt < 3 or temp1 or temp2:
                                 # msg = "Warning exchange {0}/{1}".format(
                                 #     shared_ccxt_manager.get_exchange(False).exchange_code,
                                 #     shared_ccxt_manager.get_exchange(True).exchange_code

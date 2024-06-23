@@ -8,7 +8,7 @@ from exchange.util.ccxt_manager import CcxtManager
 import telebot
 
 initialize = False
-CHAT_ID = "-4262576067"
+CHAT_ID = "-4269611597"
 
 
 class ExchangePendingThread:
