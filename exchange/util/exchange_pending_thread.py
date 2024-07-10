@@ -8,7 +8,7 @@ from exchange.util.ccxt_manager import CcxtManager
 import telebot
 
 initialize = False
-CHAT_ID = "-4269611597"
+CHAT_ID = "-4262576067"
 
 
 class ExchangePendingThread:
@@ -39,7 +39,7 @@ class ExchangePendingThread:
             self.thread.join()
 
     def job_function(self, q, shared_ccxt_manager, bot_tele):
-        total_profit = 0
+        total_profit = 5437
         while self.is_running:
             try:
                 if not q.empty():
