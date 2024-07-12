@@ -155,59 +155,84 @@ class Manager:
                                 continue
                             # ban san primary (gate) bids, mua secondary (bingx): ask
                             if primary_buy_price > 1.006 * secondary_sell_price:
-                                quantity_first = (min(
+                                is_command_group = False
+                                # Handle group order
+                                quantity_group = calc_quantity_group_order(primary_msg['order_book'],
+                                                                           secondary_msg['order_book'],
+                                                                           False)
+
+                                quantity = min(min(
                                     min(
-                                        primary_buy_price * primary_buy_quantity,
-                                        secondary_sell_price * secondary_sell_quantity,
-                                        primary_amount_usdt,
-                                        secondary_amount_usdt) / primary_buy_price, primary_amount_coin,
-                                    secondary_amount_coin))
+                                        primary_buy_price * quantity_group['quantity'],
+                                        secondary_sell_price * quantity_group['quantity']) / primary_buy_price,
+                                    primary_amount_coin,
+                                    secondary_amount_coin), (min(primary_amount_usdt, secondary_amount_usdt) / secondary_sell_price))
 
-                                if quantity_first > 100:
-                                    buy_primary_sell_secondary(__pending_queue,
-                                                               ccxt_primary,
-                                                               ccxt_secondary,
-                                                               coin_trade,
-                                                               primary_buy_price,
-                                                               secondary_sell_price,
-                                                               quantity_first)
-                                else:
-                                    is_command_group = False
-                                    # Handle group order
-                                    quantity_group = calc_quantity_group_order(primary_msg['order_book'],
-                                                                               secondary_msg['order_book'],
-                                                                               False)
+                                quantity = min(quantity, 1500)
+                                cost_group_primary = calc_cost_group_order_by_quantity(primary_msg['order_book'],
+                                                                                       quantity,
+                                                                                       False)
+                                cost_group_secondary = calc_cost_group_order_by_quantity(secondary_msg['order_book'],
+                                                                                         quantity,
+                                                                                         True)
+                                if cost_group_primary > 1.006 * cost_group_secondary:
+                                    primary_order = ccxt_primary.create_market_sell_order(coin_trade, quantity)
 
-                                    quantity = min(min(
+                                    if shared_ccxt_manager.get_exchange(False).exchange_code == ExchangesCode.GATE.value:
+                                        # ccxt_secondary['options']['createMarketBuyOrderRequiresPrice'] = False
+                                        secondary_order = ccxt_secondary.create_market_buy_order(coin_trade, cost_group_primary)
+                                    else:
+                                        secondary_order = ccxt_secondary.create_market_buy_order(coin_trade, quantity)
+                                    order_mgs_primary = round(cost_group_primary, 2)
+                                    order_mgs_secondary = round(cost_group_secondary, 2)
+                                    print("1====> Sell primary, buy secondary {0} => {1}".format(cost_group_primary, cost_group_secondary))
+                                    print("1====> Sell primary, buy secondary Mua ban quantity {0} => {1}".format(quantity, round(cost_group_primary - cost_group_secondary, 2)))
+                                    primary_pending_order = OrderStatus(True,
+                                                                        primary_order['id'],
+                                                                        order_mgs_primary)
+                                    secondary_pending_order = OrderStatus(False,
+                                                                          secondary_order['id'],
+                                                                          order_mgs_secondary)
+
+                                    msg_transaction = {'primary': primary_pending_order,
+                                                       'secondary': secondary_pending_order}
+                                    __pending_queue.put(msg_transaction)
+                                    is_command_group = True
+                                if not is_command_group:
+                                    quantity = max(min(
                                         min(
-                                            primary_buy_price * quantity_group['quantity'],
-                                            secondary_sell_price * quantity_group['quantity']) / primary_buy_price,
-                                        primary_amount_coin,
-                                        secondary_amount_coin),
-                                        (min(primary_amount_usdt, secondary_amount_usdt) / secondary_sell_price))
-
-                                    # Check price to define 100
-                                    quantity = min(quantity, 100)
-
-                                    cost_group_primary = calc_cost_group_order_by_quantity(primary_msg['order_book'],
-                                                                                           quantity,
-                                                                                           False)
-                                    cost_group_secondary = calc_cost_group_order_by_quantity(secondary_msg['order_book'],
+                                            primary_buy_price * primary_buy_quantity,
+                                            secondary_sell_price * secondary_sell_quantity,
+                                            primary_amount_usdt,
+                                            secondary_amount_usdt) / primary_buy_price, primary_amount_coin,
+                                        secondary_amount_coin), (3.1 / secondary_sell_price))
+                                    precision_invalid = (quantity * primary_buy_price) < 2 or (
+                                            quantity * secondary_sell_price) < 2
+                                    if precision_invalid:
+                                        msg = "======PRECISION PRICE======\n"
+                                        msg = msg + "USDT {0}/{1}\n".format(primary_amount_usdt, secondary_amount_usdt)
+                                        msg = msg + "COIN {0}/{1}\n".format(primary_amount_coin, secondary_amount_coin)
+                                        msg = msg + "quantity: {0}\n".format(quantity)
+                                        msg = msg + "Price buy: {0} => {1}\n".format(primary_buy_price,
+                                                                                     quantity * primary_buy_price)
+                                        msg = msg + "Second sell: {0} => {1}\n".format(secondary_sell_price,
+                                                                                       quantity * primary_buy_price)
+                                        bot.send_message(CHAT_WARNING_ID, msg)
+                                    else:
+                                        print("Buy primary and sell secondary", quantity)
+                                        primary_order = ccxt_primary.create_limit_sell_order(coin_trade,
                                                                                              quantity,
-                                                                                             True)
-                                    if cost_group_primary > 1.006 * cost_group_secondary:
-                                        primary_order = ccxt_primary.create_market_sell_order(coin_trade, quantity)
-
-                                        if shared_ccxt_manager.get_exchange(False).exchange_code == ExchangesCode.GATE.value:
-                                            secondary_order = ccxt_secondary.create_market_buy_order(coin_trade,
-                                                                                                     cost_group_primary)
-                                        else:
-                                            secondary_order = ccxt_secondary.create_market_buy_order(coin_trade,
-                                                                                                     quantity)
-                                        order_mgs_primary = round(cost_group_primary, 2)
-                                        order_mgs_secondary = round(cost_group_secondary, 2)
-                                        print("1====> Sell primary, buy secondary {0} => {1}".format(cost_group_primary, cost_group_secondary))
-                                        print("1====> Sell primary, buy secondary Mua ban quantity {0} => {1}".format(quantity, round(cost_group_primary - cost_group_secondary, 2)))
+                                                                                             primary_buy_price)
+                                        secondary_order = ccxt_secondary.create_limit_buy_order(coin_trade,
+                                                                                                quantity,
+                                                                                                secondary_sell_price)
+                                        print("Call 1 => {0} / {1}".format(primary_order['id'], secondary_order['id']))
+                                        # handle_exchange_order_transaction(bot,
+                                        #                                   ccxt_primary, ccxt_secondary,
+                                        #                                   primary_order['id'], secondary_order['id'],
+                                        #                                   coin_trade)
+                                        order_mgs_primary = round(quantity * primary_buy_price, 2)
+                                        order_mgs_secondary = round(quantity * secondary_sell_price, 2)
                                         primary_pending_order = OrderStatus(True,
                                                                             primary_order['id'],
                                                                             order_mgs_primary)
@@ -218,104 +243,93 @@ class Manager:
                                         msg_transaction = {'primary': primary_pending_order,
                                                            'secondary': secondary_pending_order}
                                         __pending_queue.put(msg_transaction)
-                                        is_command_group = True
-                                    if not is_command_group:
-                                        quantity = max(min(
-                                            min(
-                                                primary_buy_price * primary_buy_quantity,
-                                                secondary_sell_price * secondary_sell_quantity,
-                                                primary_amount_usdt,
-                                                secondary_amount_usdt) / primary_buy_price, primary_amount_coin,
-                                            secondary_amount_coin), (3.1 / secondary_sell_price))
-                                        buy_primary_sell_secondary(__pending_queue,
-                                                                   ccxt_primary,
-                                                                   ccxt_secondary,
-                                                                   coin_trade,
-                                                                   primary_buy_price,
-                                                                   secondary_sell_price,
-                                                                   quantity,
-                                                                   False)
-                                        # print("Buy primary and sell secondary", quantity)
-                                        # primary_order = ccxt_primary.create_limit_sell_order(coin_trade,
-                                        #                                                      quantity,
-                                        #                                                      primary_buy_price)
-                                        # secondary_order = ccxt_secondary.create_limit_buy_order(coin_trade,
-                                        #                                                         quantity,
-                                        #                                                         secondary_sell_price)
-                                        # print("Call 1 => {0} / {1}".format(primary_order['id'], secondary_order['id']))
-                                        # # handle_exchange_order_transaction(bot,
-                                        # #                                   ccxt_primary, ccxt_secondary,
-                                        # #                                   primary_order['id'], secondary_order['id'],
-                                        # #                                   coin_trade)
-                                        # order_mgs_primary = round(quantity * primary_buy_price, 2)
-                                        # order_mgs_secondary = round(quantity * secondary_sell_price, 2)
-                                        # primary_pending_order = OrderStatus(True,
-                                        #                                     primary_order['id'],
-                                        #                                     order_mgs_primary)
-                                        # secondary_pending_order = OrderStatus(False,
-                                        #                                       secondary_order['id'],
-                                        #                                       order_mgs_secondary)
-                                        #
-                                        # msg_transaction = {'primary': primary_pending_order,
-                                        #                    'secondary': secondary_pending_order}
-                                        # __pending_queue.put(msg_transaction)
 
                             # Bán sàn bingx, mua gate
                             elif secondary_buy_price > 1.006 * primary_sell_price:
+                                is_command_group = False
+                                # Handle group order
+                                quantity_group = calc_quantity_group_order(primary_msg['order_book'],
+                                                                           secondary_msg['order_book'],
+                                                                           True)
 
-                                quantity_first = min(
+                                quantity = min(min(
+                                    min(
+                                        secondary_buy_price * quantity_group['quantity'],
+                                        primary_sell_price * quantity_group['quantity']) / secondary_buy_price,
+                                    primary_amount_coin,
+                                    secondary_amount_coin), (min(primary_amount_usdt, secondary_amount_usdt) / primary_sell_price))
+
+                                quantity = min(quantity, 1500)
+                                # Bán sàn bingx, mua gate cost_group_secondary
+                                cost_group_primary = calc_cost_group_order_by_quantity(primary_msg['order_book'],
+                                                                                       quantity,
+                                                                                       True)
+                                cost_group_secondary = calc_cost_group_order_by_quantity(secondary_msg['order_book'],
+                                                                                         quantity,
+                                                                                         False)
+                                if cost_group_secondary > 1.006 * cost_group_primary:
+                                    if shared_ccxt_manager.get_exchange(True).exchange_code == ExchangesCode.GATE.value:
+                                        # ccxt_primary['options']['createMarketBuyOrderRequiresPrice'] = False
+                                        primary_order = ccxt_primary.create_market_buy_order(coin_trade, cost_group_primary)
+                                    else:
+                                        primary_order = ccxt_primary.create_market_buy_order(coin_trade, quantity)
+                                    secondary_order = ccxt_secondary.create_market_sell_order(coin_trade, quantity)
+                                    order_mgs_primary = round(cost_group_primary, 2)
+                                    order_mgs_secondary = round(cost_group_secondary, 2)
+                                    print("2====> buy primary, sell secondary {0} => {1}".format(cost_group_primary,
+                                                                                                 cost_group_secondary))
+                                    print("2====> buy primary, sell secondary Mua ban quantity {0} => {1}".format(quantity, round(
+                                        cost_group_primary - cost_group_secondary, 2)))
+
+                                    primary_pending_order = OrderStatus(True,
+                                                                        primary_order['id'],
+                                                                        order_mgs_primary)
+                                    secondary_pending_order = OrderStatus(False,
+                                                                          secondary_order['id'],
+                                                                          order_mgs_secondary)
+
+                                    msg_transaction = {'primary': primary_pending_order,
+                                                       'secondary': secondary_pending_order}
+                                    __pending_queue.put(msg_transaction)
+                                    is_command_group = True
+                                if not is_command_group:
+                                    quantity = max(min(
                                         min(secondary_buy_price * secondary_buy_quantity,
                                             primary_sell_price * primary_sell_quantity,
                                             secondary_amount_usdt,
                                             primary_amount_usdt) / secondary_buy_price, secondary_amount_coin,
-                                        primary_amount_coin)
+                                        primary_amount_coin), (3.1 / primary_sell_price))
 
-                                if quantity_first > 100:
-                                    sell_primary_buy_secondary(__pending_queue,
-                                                               ccxt_primary,
-                                                               ccxt_secondary,
-                                                               coin_trade,
-                                                               primary_sell_price,
-                                                               secondary_buy_price,
-                                                               quantity_first)
-                                else:
-                                    is_command_group = False
-                                    # Handle group order
-                                    quantity_group = calc_quantity_group_order(primary_msg['order_book'],
-                                                                               secondary_msg['order_book'],
-                                                                               True)
-
-                                    quantity = min(min(
-                                        min(
-                                            secondary_buy_price * quantity_group['quantity'],
-                                            primary_sell_price * quantity_group['quantity']) / secondary_buy_price,
-                                        primary_amount_coin,
-                                        secondary_amount_coin), (min(primary_amount_usdt, secondary_amount_usdt) / primary_sell_price))
-
-                                    # Check price to define 100
-                                    quantity = min(quantity, 100)
-
-                                    # Bán sàn bingx, mua gate cost_group_secondary
-                                    cost_group_primary = calc_cost_group_order_by_quantity(primary_msg['order_book'],
-                                                                                           quantity,
-                                                                                           True)
-                                    cost_group_secondary = calc_cost_group_order_by_quantity(secondary_msg['order_book'],
-                                                                                             quantity,
-                                                                                             False)
-                                    if cost_group_secondary > 1.006 * cost_group_primary:
-                                        if shared_ccxt_manager.get_exchange(True).exchange_code == ExchangesCode.GATE.value:
-                                            # ccxt_primary['options']['createMarketBuyOrderRequiresPrice'] = False
-                                            primary_order = ccxt_primary.create_market_buy_order(coin_trade, cost_group_primary)
-                                        else:
-                                            primary_order = ccxt_primary.create_market_buy_order(coin_trade, quantity)
-                                        secondary_order = ccxt_secondary.create_market_sell_order(coin_trade, quantity)
-                                        order_mgs_primary = round(cost_group_primary, 2)
-                                        order_mgs_secondary = round(cost_group_secondary, 2)
-                                        print("2====> buy primary, sell secondary {0} => {1}".format(cost_group_primary,
-                                                                                                     cost_group_secondary))
-                                        print("2====> buy primary, sell secondary Mua ban quantity {0} => {1}".format(quantity, round(
-                                            cost_group_primary - cost_group_secondary, 2)))
-
+                                    precision_invalid = (quantity * secondary_buy_price) < 2 or (
+                                            quantity * primary_sell_price) < 2
+                                    if precision_invalid:
+                                        msg = "======PRECISION PRICE======\n"
+                                        msg = msg + "quantity: {0}\n".format(quantity)
+                                        msg = msg + "USDT {0}/{1} => {2}\n".format(primary_amount_usdt,
+                                                                                   secondary_amount_usdt, (
+                                                                                           primary_amount_usdt + secondary_amount_usdt))
+                                        msg = msg + "COIN {0}/{1} => {2}\n".format(primary_amount_coin,
+                                                                                   secondary_amount_coin, (
+                                                                                           primary_amount_coin + secondary_amount_coin))
+                                        msg = msg + "Price sell: {0} => {1}\n".format(primary_sell_price,
+                                                                                      quantity * primary_sell_price)
+                                        msg = msg + "Second buy: {0} => {1}\n".format(secondary_buy_price,
+                                                                                      quantity * secondary_buy_price)
+                                        bot.send_message(CHAT_WARNING_ID, msg)
+                                    else:
+                                        print("Buy primary and sell secondary", quantity)
+                                        primary_order = ccxt_primary.create_limit_buy_order(coin_trade,
+                                                                                            quantity,
+                                                                                            primary_sell_price)
+                                        secondary_order = ccxt_secondary.create_limit_sell_order(coin_trade,
+                                                                                                 quantity,
+                                                                                                 secondary_buy_price)
+                                        # handle_exchange_order_transaction(bot,
+                                        #                                   ccxt_primary, ccxt_secondary,
+                                        #                                   primary_order['id'], secondary_order['id'],
+                                        #                                   coin_trade)
+                                        order_mgs_primary = round(quantity * primary_sell_price, 2)
+                                        order_mgs_secondary = round(quantity * secondary_buy_price, 2)
                                         primary_pending_order = OrderStatus(True,
                                                                             primary_order['id'],
                                                                             order_mgs_primary)
@@ -326,46 +340,6 @@ class Manager:
                                         msg_transaction = {'primary': primary_pending_order,
                                                            'secondary': secondary_pending_order}
                                         __pending_queue.put(msg_transaction)
-                                        is_command_group = True
-                                    if not is_command_group:
-                                        quantity = max(min(
-                                            min(secondary_buy_price * secondary_buy_quantity,
-                                                primary_sell_price * primary_sell_quantity,
-                                                secondary_amount_usdt,
-                                                primary_amount_usdt) / secondary_buy_price, secondary_amount_coin,
-                                            primary_amount_coin), (3.1 / primary_sell_price))
-
-                                        print("Sell primary and buy secondary", quantity)
-                                        sell_primary_buy_secondary(__pending_queue,
-                                                                   ccxt_primary,
-                                                                   ccxt_secondary,
-                                                                   coin_trade,
-                                                                   primary_sell_price,
-                                                                   secondary_buy_price,
-                                                                   quantity,
-                                                                   False)
-                                        # primary_order = ccxt_primary.create_limit_buy_order(coin_trade,
-                                        #                                                     quantity,
-                                        #                                                     primary_sell_price)
-                                        # secondary_order = ccxt_secondary.create_limit_sell_order(coin_trade,
-                                        #                                                          quantity,
-                                        #                                                          secondary_buy_price)
-                                        # # handle_exchange_order_transaction(bot,
-                                        # #                                   ccxt_primary, ccxt_secondary,
-                                        # #                                   primary_order['id'], secondary_order['id'],
-                                        # #                                   coin_trade)
-                                        # order_mgs_primary = round(quantity * primary_sell_price, 2)
-                                        # order_mgs_secondary = round(quantity * secondary_buy_price, 2)
-                                        # primary_pending_order = OrderStatus(True,
-                                        #                                     primary_order['id'],
-                                        #                                     order_mgs_primary)
-                                        # secondary_pending_order = OrderStatus(False,
-                                        #                                       secondary_order['id'],
-                                        #                                       order_mgs_secondary)
-                                        #
-                                        # msg_transaction = {'primary': primary_pending_order,
-                                        #                    'secondary': secondary_pending_order}
-                                        # __pending_queue.put(msg_transaction)
                                         # __pending_queue.put(secondary_pending_order)
 
                             else:
@@ -564,49 +538,3 @@ def calc_cost_group_order_by_quantity(order, quantity, is_buy):
                 order['bids'][2][0] * ok_q3 +
                 order['bids'][3][0] * ok_q4 +
                 order['bids'][4][0] * ok_q5)
-
-
-def buy_primary_sell_secondary(__pending_queue, ccxt_primary, ccxt_secondary, coin_trade, primary_buy_price, secondary_sell_price, quantity, is_max=True):
-    log = 'Condition1' if is_max else 'Condition2'
-    print("Buy primary and sell secondary {0} => {1}".format(quantity, log))
-    primary_order = ccxt_primary.create_limit_sell_order(coin_trade,
-                                                         quantity,
-                                                         primary_buy_price)
-    secondary_order = ccxt_secondary.create_limit_buy_order(coin_trade,
-                                                            quantity,
-                                                            secondary_sell_price)
-    print("Call 1 => {0} / {1}".format(primary_order['id'], secondary_order['id']))
-    order_mgs_primary = round(quantity * primary_buy_price, 2)
-    order_mgs_secondary = round(quantity * secondary_sell_price, 2)
-    primary_pending_order = OrderStatus(True,
-                                        primary_order['id'],
-                                        order_mgs_primary)
-    secondary_pending_order = OrderStatus(False,
-                                          secondary_order['id'],
-                                          order_mgs_secondary)
-
-    msg_transaction = {'primary': primary_pending_order,
-                       'secondary': secondary_pending_order}
-    __pending_queue.put(msg_transaction)
-
-def sell_primary_buy_secondary(__pending_queue, ccxt_primary, ccxt_secondary, coin_trade, primary_sell_price, secondary_buy_price, quantity, is_max=True):
-    log = 'Condition1' if is_max else 'Condition2'
-    print("Sell primary and buy secondary {0} => {1}".format(quantity, log))
-    primary_order = ccxt_primary.create_limit_buy_order(coin_trade,
-                                                        quantity,
-                                                        primary_sell_price)
-    secondary_order = ccxt_secondary.create_limit_sell_order(coin_trade,
-                                                             quantity,
-                                                             secondary_buy_price)
-    order_mgs_primary = round(quantity * primary_sell_price, 2)
-    order_mgs_secondary = round(quantity * secondary_buy_price, 2)
-    primary_pending_order = OrderStatus(True,
-                                        primary_order['id'],
-                                        order_mgs_primary)
-    secondary_pending_order = OrderStatus(False,
-                                          secondary_order['id'],
-                                          order_mgs_secondary)
-
-    msg_transaction = {'primary': primary_pending_order,
-                       'secondary': secondary_pending_order}
-    __pending_queue.put(msg_transaction)

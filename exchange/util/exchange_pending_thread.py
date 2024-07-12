@@ -39,7 +39,7 @@ class ExchangePendingThread:
             self.thread.join()
 
     def job_function(self, q, shared_ccxt_manager, bot_tele):
-        total_profit = 5437
+        total_profit = 5473
         while self.is_running:
             try:
                 if not q.empty():
