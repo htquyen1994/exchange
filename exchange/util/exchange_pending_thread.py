@@ -39,7 +39,7 @@ class ExchangePendingThread:
             self.thread.join()
 
     def job_function(self, q, shared_ccxt_manager, bot_tele):
-        total_profit = 5473
+        total_profit = 6216
         while self.is_running:
             try:
                 if not q.empty():
@@ -56,10 +56,28 @@ class ExchangePendingThread:
                         count = count + 1
                         sleep(4)
                         try:
-                            primary_order_status = primary_ccxt_manager.fetch_order(primary_transaction.order_id,
+                            primary_order_status = None
+                            if shared_ccxt_manager.get_exchange(True).exchange_code == ExchangesCode.BYBIT.value:
+                                primary_order_status = primary_ccxt_manager.fetch_open_order(
+                                    primary_transaction.order_id, symbol)
+                                print("Lệnh open bybit ==> {0}".format(primary_order_status))
+                                if primary_order_status is None:
+                                    primary_order_status = primary_ccxt_manager.fetch_closed_order(
+                                        primary_transaction.order_id, symbol)
+                                    print("Lệnh closed bybit ==> {0}".format(primary_order_status))
+                            else:
+                                primary_order_status = primary_ccxt_manager.fetch_order(primary_transaction.order_id,
                                                                                     symbol)
                             secondary_order_status = secondary_ccxt_manager.fetch_order(secondary_transaction.order_id,
                                                                                         symbol)
+
+                            # TODO after if secondary exchange is a bybit
+                            # if shared_ccxt_manager.get_exchange(False).exchange_code == ExchangesCode.BYBIT.value:
+                            #     secondary_order_status = secondary_ccxt_manager.fetch_open_order(
+                            #         primary_transaction.order_id, symbol)
+                            #     if secondary_order_status is None:
+                            #         secondary_order_status = secondary_ccxt_manager.fetch_closed_order(
+                            #             primary_transaction.order_id, symbol)
 
                             filled_primary = primary_order_status['filled']
                             filled_secondary = secondary_order_status['filled']
@@ -107,3 +125,5 @@ def get_total_cost(exchange_code, order):
         return float(order['info']['cummulativeQuoteQty'])
     if exchange_code == ExchangesCode.GATE.value:
         return float(order['info']['filled_total'])
+    if exchange_code == ExchangesCode.BYBIT.value:
+        return float(order['info']['cumExecValue'])
