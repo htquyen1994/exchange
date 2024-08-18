@@ -20,16 +20,6 @@ def require_authenticate(func: callable, *args, **kwargs):
     :return: -
     """
     try:
-        # # get session key
-        # session_key = AuthUtil.get_key()
-        # if session_key is None or len(session_key) == 0:
-        #     Logger.info("require_authenticate",
-        #                 "Session key not found, redirect to login")
-        #     return LoginUtil.redirect_login()
-        #
-        # if session_key != TraderAgent.get_instance().get_session_key():
-        #     return LoginUtil.redirect_login()
-        # OK, call decorate function
         return func(*args, **kwargs)
 
     except Exception as ex:

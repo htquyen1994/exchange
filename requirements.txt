@@ -21,7 +21,6 @@ Jinja2==2.10.3
 jsonschema==3.2.0
 MarkupSafe==1.1.1
 msgpack==0.6.2
-numpy==1.18.1
 openapi-spec-validator==0.2.8
 paho-mqtt==1.5.0
 prettytable==0.7.2
@@ -37,7 +36,7 @@ python-dateutil==2.8.1
 python-engineio==3.11.2
 python-socketio==4.4.0
 pytz==2019.3
-PyYAML==5.3
+PyYAML==6.0
 requests==2.22.0
 rsa==4.0
 six==1.14.0
@@ -53,5 +52,3 @@ Flask-Cors==4.0.0
 ccxt==4.3.8
 Telethon==1.35.0
 pyTelegramBotAPI==4.17.0
-
-

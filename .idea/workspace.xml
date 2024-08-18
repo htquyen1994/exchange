@@ -22,7 +22,19 @@
     <select />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="91983283-1624-4e3c-9f8a-9bab5542ad2e" name="Default Changelist" comment="" />
+    <list default="true" id="91983283-1624-4e3c-9f8a-9bab5542ad2e" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/config/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/exchange/logic/exchange_logic.py" beforeDir="false" afterPath="$PROJECT_DIR$/exchange/logic/exchange_logic.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/exchange/util/auth.py" beforeDir="false" afterPath="$PROJECT_DIR$/exchange/util/auth.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/exchange/util/ccxt_manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/exchange/util/ccxt_manager.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/exchange/util/manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/exchange/util/manager.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/swagger_server/models/configure_trade_request.py" beforeDir="false" afterPath="$PROJECT_DIR$/swagger_server/models/configure_trade_request.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/swagger_server/models/exchange_request.py" beforeDir="false" afterPath="$PROJECT_DIR$/swagger_server/models/exchange_request.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/webapp.py" beforeDir="false" afterPath="$PROJECT_DIR$/webapp.py" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -36,7 +48,23 @@
     </option>
   </component>
   <component name="Git.Settings">
-    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../../.." />
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;htquyen1994&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/htquyen1994/exchange.git&quot;,
+    &quot;accountId&quot;: &quot;756f3d04-9275-4f56-80c9-defa026e0a53&quot;
+  }
+}</component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="file://$USER_HOME$/AppData/Local/Programs/Python/Python38/Lib/site-packages/pybitget/client.py" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$USER_HOME$/AppData/Local/Programs/Python/Python38/Lib/site-packages/pybitget/utils.py" root0="FORCE_HIGHLIGHTING" />
   </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 3
@@ -49,13 +77,15 @@
   </component>
   <component name="PropertiesComponent">{
   &quot;keyToString&quot;: {
-    &quot;Python.webapp.executor&quot;: &quot;Run&quot;,
-    &quot;last_opened_file_path&quot;: &quot;D:/Workspace/exchange-project/app-exchange/exchange/util&quot;,
+    &quot;Python.webapp.executor&quot;: &quot;Debug&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/Workspace/exchange-project/sync-exchange/swagger_server/models&quot;,
     &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;
   }
 }</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\Workspace\exchange-project\sync-exchange\swagger_server\models" />
       <recent name="D:\Workspace\exchange-project\app-exchange\exchange\util" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
@@ -137,24 +167,84 @@
           <option name="timeStamp" value="5" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/exchange/logic/exchange_logic.py</url>
-          <line>14</line>
-          <option name="timeStamp" value="16" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/exchange/util/ccxt_manager.py</url>
-          <line>49</line>
-          <option name="timeStamp" value="25" />
+          <url>file://$PROJECT_DIR$/exchange/util/manager.py</url>
+          <line>229</line>
+          <option name="timeStamp" value="35" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/exchange/util/manager.py</url>
-          <line>67</line>
-          <option name="timeStamp" value="27" />
+          <line>148</line>
+          <option name="timeStamp" value="38" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/exchange/util/ccxt_manager.py</url>
-          <line>9</line>
-          <option name="timeStamp" value="32" />
+          <url>file://$PROJECT_DIR$/exchange/util/manager.py</url>
+          <line>112</line>
+          <option name="timeStamp" value="39" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/exchange/util/manager.py</url>
+          <line>265</line>
+          <option name="timeStamp" value="40" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/exchange/util/manager.py</url>
+          <line>261</line>
+          <option name="timeStamp" value="41" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/exchange/util/manager.py</url>
+          <line>267</line>
+          <option name="timeStamp" value="42" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/exchange/util/manager.py</url>
+          <line>301</line>
+          <option name="timeStamp" value="43" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/exchange/util/manager.py</url>
+          <line>353</line>
+          <option name="timeStamp" value="44" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/exchange/util/sync_core/exchange_bingx.py</url>
+          <line>31</line>
+          <option name="timeStamp" value="45" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/exchange/util/manager.py</url>
+          <line>115</line>
+          <option name="timeStamp" value="46" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/exchange/util/manager.py</url>
+          <line>252</line>
+          <option name="timeStamp" value="47" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/exchange/util/sync_core/exchange_gate.py</url>
+          <line>30</line>
+          <option name="timeStamp" value="48" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/exchange/util/manager.py</url>
+          <line>310</line>
+          <option name="timeStamp" value="49" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/exchange/util/manager.py</url>
+          <line>380</line>
+          <option name="timeStamp" value="50" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/exchange/util/manager.py</url>
+          <line>366</line>
+          <option name="timeStamp" value="51" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/exchange/util/manager.py</url>
+          <line>338</line>
+          <option name="timeStamp" value="52" />
         </line-breakpoint>
       </breakpoints>
       <default-breakpoints>

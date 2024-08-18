@@ -14,10 +14,15 @@ class ExchangeLogic:
         try:
             primary_exchange = configure.primary_exchange
             secondary_exchange = configure.secondary_exchange
-            limit = configure.limit
-            simulated = configure.simulated
             coin = configure.coin
-            Manager.get_instance().set_config_trade(primary_exchange, secondary_exchange, coin, limit, simulated)
+            Manager.get_instance().set_config_trade(primary_exchange,
+                                                    secondary_exchange,
+                                                    coin,
+                                                    configure.rotation_coin,
+                                                    configure.rotation_usdt,
+                                                    configure.total_coin,
+                                                    configure.total_usdt,
+                                                    )
             resp = CommonResponse()
             return resp, 200
         except Exception as ex:
