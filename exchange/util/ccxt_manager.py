@@ -13,6 +13,9 @@ def init_cctx_exchange(exchange):
         param['password'] = exchange.password
         ccxt_exchange = ccxt.okx(param)
     elif exchange_code == ExchangesCode.GATE.value:
+        param['options'] = {
+            'createMarketBuyOrderRequiresPrice': False
+        }
         ccxt_exchange = ccxt.gate(param)
     elif exchange_code == ExchangesCode.HOUBI.value:
         ccxt_exchange = ccxt.huobi(param)
