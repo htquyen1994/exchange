@@ -29,6 +29,7 @@ class TimeRequest:
 
 
 class ExchangesCode(Enum):
+    BINGX = 'bingx'
     BINANCE = 'binance'
     OKEX = 'okex'
     GATE = 'gate'
