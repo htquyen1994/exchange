@@ -180,7 +180,8 @@ class Manager:
                                 if cost_group_primary > ARBITRAGE_THRESHOLD * cost_group_secondary:
                                     primary_order = ccxt_primary.create_market_sell_order(convert_coin(coin_trade, True), quantity)
 
-                                    if shared_ccxt_manager.get_exchange(False).exchange_code == ExchangesCode.GATE.value:
+                                    if shared_ccxt_manager.get_exchange(False).exchange_code in [ExchangesCode.GATE.value, ExchangesCode.BITMART.value]:
+                                    
                                         # ccxt_secondary['options']['createMarketBuyOrderRequiresPrice'] = False
                                         secondary_order = ccxt_secondary.create_market_buy_order(coin_trade, cost_group_primary)
                                     else:
@@ -277,7 +278,7 @@ class Manager:
                                                                                          quantity,
                                                                                          False)
                                 if cost_group_secondary > ARBITRAGE_THRESHOLD * cost_group_primary:
-                                    if shared_ccxt_manager.get_exchange(True).exchange_code == ExchangesCode.GATE.value:
+                                    if shared_ccxt_manager.get_exchange(True).exchange_code in [ExchangesCode.GATE.value, ExchangesCode.BITMART.value]:
                                         # ccxt_primary['options']['createMarketBuyOrderRequiresPrice'] = False
                                         primary_order = ccxt_primary.create_market_buy_order(convert_coin(coin_trade, True), cost_group_primary)
                                     else:
