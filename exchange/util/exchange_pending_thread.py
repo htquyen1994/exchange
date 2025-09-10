@@ -87,6 +87,7 @@ class ExchangePendingThread:
                             side_secondary = secondary_order_status['side']
                             cost_primary = get_total_cost(primary_exchange_code, primary_order_status)
                             cost_secondary = get_total_cost(secondary_exchange_code, secondary_order_status)
+                            amount = min(filled_primary, filled_secondary)
                             if is_order_completed(primary_order_status) and is_order_completed(secondary_order_status):
                                 profit = 0
                                 if side_primary == 'buy' and side_secondary == 'sell':
@@ -96,10 +97,10 @@ class ExchangePendingThread:
                                 total_profit = round((total_profit + profit), 4)
                                 msg = (
                                     f"✅ Trade Completed\n"
-                                    f"- {primary_exchange_code} | OrderID: {primary_transaction.order_id} | Side: {side_primary} | Status: {primary_order_status['status']}\n"
-                                    f"- {secondary_exchange_code} | OrderID: {secondary_transaction.order_id} | Side: {side_secondary} | Status: {secondary_order_status['status']}\n"
-                                    f"Profit (this trade): {profit}\n"
-                                    f"Total Profit: {total_profit}"
+                                    f"{primary_exchange_code.upper()} | OrderID: {primary_transaction.order_id} | Side: {side_primary} | Status: {primary_order_status['status']}\n"
+                                    f"{secondary_exchange_code.upper()} | OrderID: {secondary_transaction.order_id} | Side: {side_secondary} | Status: {secondary_order_status['status']}\n"
+                                    f"Amount: {amount}\n"
+                                    f"Profit: {profit}\n"
                                 )
                                 bot_tele.send_message(CHAT_ID, msg)
                             else:
@@ -112,24 +113,22 @@ class ExchangePendingThread:
                                     # Update message với thông tin cả 2 orders
                                     msg = (
                                         f"❌ Cancel Orders\n"
-                                        f"- {primary_exchange_code} | OrderID: {primary_transaction.order_id} | "
+                                        f"{primary_exchange_code.upper()} | OrderID: {primary_transaction.order_id} | "
                                         f"Total: {primary_transaction.total} | Status: {primary_order_status['status']}\n"
-                                        f"- {secondary_exchange_code} | OrderID: {secondary_transaction.order_id} | "
+                                        f"{secondary_exchange_code.upper()} | OrderID: {secondary_transaction.order_id} | "
                                         f"Total: {secondary_transaction.total} | Status: {secondary_order_status['status']}\n"
                                     )
 
                                 else:
-                                    amount = min(filled_primary, filled_secondary)
                                     profit = abs(round(amount * price_primary - amount * price_secondary, 4))
                                     total_profit = round((total_profit + profit), 4)
 
                                     msg = (
                                         f"⏳ Pending Orders\n"
-                                        f"- {primary_exchange_code} | OrderID: {primary_transaction.order_id} | Status: {primary_order_status['status']}\n"
-                                        f"- {secondary_exchange_code} | OrderID: {secondary_transaction.order_id} | Status: {secondary_order_status['status']}\n"
-                                        f"Amount Filled: {amount}\n"
-                                        f"Profit (this round): {profit}\n"
-                                        f"Total Profit: {total_profit}\n"
+                                        f"{primary_exchange_code.upper()} | OrderID: {primary_transaction.order_id} | Status: {primary_order_status['status']}\n"
+                                        f"{secondary_exchange_code.upper()} | OrderID: {secondary_transaction.order_id} | Status: {secondary_order_status['status']}\n"
+                                        f"Amount: {amount}\n"
+                                        f"Profit: {profit}\n"
                                     )
 
                                 bot_tele.send_message(CHAT_ID, msg)
