@@ -14,8 +14,8 @@ from time import gmtime, strftime
 
 from exchange.util.log_agent import LoggerAgent
 
-CHAT_ID = "-4269611597"
-CHAT_WARNING_ID = "-4221462272"
+CHAT_ID = "-4602382105"
+CHAT_WARNING_ID = "-4869126380"
 
 
 
@@ -79,7 +79,7 @@ class Manager:
         self.queue_config.put(ccxt)
 
     def do_work(self, queue_config):
-        bot = telebot.TeleBot("6508394630:AAGioVntFAwjr5a3lMZW_Jpx2vaOaNo_PLI")
+        bot = telebot.TeleBot("7556592362:AAEeJHXweydtsOYYH7KX_d2QyqFQOPNAwm4")
         current_time = datetime.datetime.now()
 
         while True:
@@ -169,7 +169,7 @@ class Manager:
                                     primary_amount_coin,
                                     secondary_amount_coin), (min(primary_amount_usdt, secondary_amount_usdt) / secondary_sell_price))
 
-                                quantity = min(quantity, 6863417)
+                                quantity = min(quantity, 1443)
                                 cost_group_primary = calc_cost_group_order_by_quantity(primary_msg['order_book'],
                                                                                        quantity,
                                                                                        False)
@@ -186,8 +186,6 @@ class Manager:
                                         secondary_order = ccxt_secondary.create_market_buy_order(coin_trade, quantity)
                                     order_mgs_primary = round(cost_group_primary, 2)
                                     order_mgs_secondary = round(cost_group_secondary, 2)
-                                    print("1====> Sell primary, buy secondary {0} => {1}".format(cost_group_primary, cost_group_secondary))
-                                    print("1====> Sell primary, buy secondary Mua ban quantity {0} => {1}".format(quantity, round(cost_group_primary - cost_group_secondary, 2)))
                                     primary_pending_order = OrderStatus(True,
                                                                         primary_order['id'],
                                                                         order_mgs_primary)
@@ -200,13 +198,24 @@ class Manager:
                                     __pending_queue.put(msg_transaction)
                                     is_command_group = True
                                 if not is_command_group:
-                                    quantity = max(min(
+                                    # quantity = max(min(
+                                    #     min(
+                                    #         primary_buy_price * primary_buy_quantity,
+                                    #         secondary_sell_price * secondary_sell_quantity,
+                                    #         primary_amount_usdt,
+                                    #         secondary_amount_usdt) / primary_buy_price, primary_amount_coin,
+                                    #     secondary_amount_coin), (3.1 / secondary_sell_price))
+                                    quantity = min(
                                         min(
                                             primary_buy_price * primary_buy_quantity,
                                             secondary_sell_price * secondary_sell_quantity,
                                             primary_amount_usdt,
                                             secondary_amount_usdt) / primary_buy_price, primary_amount_coin,
-                                        secondary_amount_coin), (3.1 / secondary_sell_price))
+                                        secondary_amount_coin)
+                                    checked = quantity * secondary_sell_price;
+                                    if  checked < 3.2:
+                                        bot.send_message(CHAT_ID, "Volumn small, SKIP")
+                                        continue
                                     precision_invalid = (quantity * primary_buy_price) < 2 or (
                                             quantity * secondary_sell_price) < 2
                                     if precision_invalid:
@@ -220,14 +229,14 @@ class Manager:
                                                                                        quantity * primary_buy_price)
                                         bot.send_message(CHAT_WARNING_ID, msg)
                                     else:
-                                        print("Buy primary and sell secondary", quantity)
+                                        # print("Buy primary and sell secondary", quantity)
                                         primary_order = ccxt_primary.create_limit_sell_order(convert_coin(coin_trade, True),
                                                                                              quantity,
                                                                                              primary_buy_price)
                                         secondary_order = ccxt_secondary.create_limit_buy_order(coin_trade,
                                                                                                 quantity,
                                                                                                 secondary_sell_price)
-                                        print("Call 1 => {0} / {1}".format(primary_order['id'], secondary_order['id']))
+                                        # print("Call 1 => {0} / {1}".format(primary_order['id'], secondary_order['id']))
                                         # handle_exchange_order_transaction(bot,
                                         #                                   ccxt_primary, ccxt_secondary,
                                         #                                   primary_order['id'], secondary_order['id'],
@@ -260,7 +269,7 @@ class Manager:
                                     primary_amount_coin,
                                     secondary_amount_coin), (min(primary_amount_usdt, secondary_amount_usdt) / primary_sell_price))
 
-                                quantity = min(quantity, 6863417)
+                                quantity = min(quantity, 1443)
                                 # Bán sàn bingx, mua gate cost_group_secondary
                                 cost_group_primary = calc_cost_group_order_by_quantity(primary_msg['order_book'],
                                                                                        quantity,
@@ -294,12 +303,16 @@ class Manager:
                                     __pending_queue.put(msg_transaction)
                                     is_command_group = True
                                 if not is_command_group:
-                                    quantity = max(min(
+                                    quantity = min(
                                         min(secondary_buy_price * secondary_buy_quantity,
                                             primary_sell_price * primary_sell_quantity,
                                             secondary_amount_usdt,
                                             primary_amount_usdt) / secondary_buy_price, secondary_amount_coin,
-                                        primary_amount_coin), (3.1 / primary_sell_price))
+                                        primary_amount_coin)
+                                    checked = quantity * primary_sell_price;
+                                    if  checked < 3.2:
+                                        bot.send_message(CHAT_ID, "Volumn small, SKIP")
+                                        continue
 
                                     precision_invalid = (quantity * secondary_buy_price) < 2 or (
                                             quantity * primary_sell_price) < 2
@@ -318,7 +331,7 @@ class Manager:
                                                                                       quantity * secondary_buy_price)
                                         bot.send_message(CHAT_WARNING_ID, msg)
                                     else:
-                                        print("Buy primary and sell secondary", quantity)
+                                        # print("Buy primary and sell secondary", quantity)
                                         primary_order = ccxt_primary.create_limit_buy_order(convert_coin(coin_trade, True),
                                                                                             quantity,
                                                                                             primary_sell_price)
@@ -433,7 +446,7 @@ def handle_exchange_order_transaction(bot, exchange_primary, exchange_secondary,
         try:
             primary_order_status = exchange_primary.fetch_order(primary_order_id, symbol)
             secondary_order_status = exchange_secondary.fetch_order(secondary_order_id, symbol)
-            print("Order status {0} / {1} ".format(primary_order_status['status'], secondary_order_status['status']))
+            # print("Order status {0} / {1} ".format(primary_order_status['status'], secondary_order_status['status']))
             if primary_order_status['status'] == 'closed' and secondary_order_status['status'] == 'closed':
                 bot.send_message(CHAT_ID, "Buy sell success")
                 # count = count + 1

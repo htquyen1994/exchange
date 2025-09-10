@@ -8,7 +8,7 @@ from exchange.util.ccxt_manager import CcxtManager
 import telebot
 
 initialize = False
-CHAT_ID = "-4269611597"
+CHAT_ID = "-4602382105"
 
 
 class ExchangePendingThread:
@@ -87,7 +87,7 @@ class ExchangePendingThread:
                             side_secondary = secondary_order_status['side']
                             cost_primary = get_total_cost(primary_exchange_code, primary_order_status)
                             cost_secondary = get_total_cost(secondary_exchange_code, secondary_order_status)
-                            if primary_order_status['status'] == 'closed' and secondary_order_status['status'] == 'closed':
+                            if is_order_completed(primary_order_status) and is_order_completed(secondary_order_status):
                                 profit = 0
                                 if side_primary == 'buy' and side_secondary == 'sell':
                                     profit = round((cost_secondary - cost_primary), 4)
@@ -98,17 +98,30 @@ class ExchangePendingThread:
                                                                                                             total_profit))
                             else:
                                 msg = "Canceled "
-                                if primary_order_status['status'] == 'open':
+                                #if is_order_pending(primary_order_status):
+                                #    primary_ccxt_manager.cancel_order(primary_transaction.order_id, symbol)
+                                #    msg = msg + " primary {0} / status: {1}".format(primary_transaction.total, primary_order_status['status'])
+                                #elif is_order_pending(secondary_order_status):
+                                #    secondary_ccxt_manager.cancel_order(secondary_transaction.order_id, symbol)
+                                #    msg = msg + " secondary {0} / status: {1}".format(secondary_transaction.total, secondary_order_status['status'])
+                                if is_order_pending(primary_order_status) and is_order_pending(secondary_order_status):
+                                    # Cancel primary order
                                     primary_ccxt_manager.cancel_order(primary_transaction.order_id, symbol)
-                                    msg = msg + " primary {0}".format(primary_transaction.total)
-                                elif secondary_order_status['status'] == 'open':
+                                    # Cancel secondary order  
                                     secondary_ccxt_manager.cancel_order(secondary_transaction.order_id, symbol)
-                                    msg = msg + " secondary {0}".format(secondary_transaction.total)
+                                    # Update message với thông tin cả 2 orders
+                                    msg = msg + " primary {0} / status: {1}, secondary {2} / status: {3}".format(
+                                        primary_transaction.total, 
+                                        primary_order_status['status'],
+                                        secondary_transaction.total,
+                                        secondary_order_status['status']
+                                    )
 
                                 amount = min(filled_primary, filled_secondary)
                                 profit = abs(round(amount * price_primary - amount * price_secondary, 4))
                                 total_profit = round((total_profit + profit), 4)
                                 msg = msg + " => total: {0}".format(total_profit)
+                                msg = msg + "=> status: {0}/{1}".format(primary_order_status['status'], secondary_order_status['status'])
                                 bot_tele.send_message(CHAT_ID, msg)
                         except Exception as err:
                             print("Error: {0}".format(err))
@@ -127,3 +140,15 @@ def get_total_cost(exchange_code, order):
         return float(order['info']['filled_total'])
     if exchange_code == ExchangesCode.BYBIT.value:
         return float(order['info']['cumExecValue'])
+    if exchange_code == ExchangesCode.MEXC.value:
+        return float(order['info']['cummulativeQuoteQty'])
+    if exchange_code == ExchangesCode.BITMART.value:
+        return float(order['info']['filledNotional'])
+    
+def is_order_completed(order_status):
+    status = order_status['status'].lower()
+    return status in ['closed', 'filled']
+
+def is_order_pending(order_status):
+    status = order_status['status'].lower()
+    return status in ['open', 'new', 'partially_filled'] 
