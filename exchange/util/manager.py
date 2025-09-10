@@ -18,8 +18,8 @@ import traceback
 CHAT_ID = "-4602382105"
 CHAT_WARNING_ID = "-4869126380"
 CHAT_ERROR_ID = "-4669495904"
-
-
+ARBITRAGE_THRESHOLD = 1.016
+MAX_TRADE_QUANTITY = 1443
 
 class Manager:
     start_flag = True
@@ -157,7 +157,7 @@ class Manager:
                                 sleep(20)
                                 continue
                             # ban san primary (gate) bids, mua secondary (bingx): ask
-                            if primary_buy_price > 1.006 * secondary_sell_price:
+                            if primary_buy_price > ARBITRAGE_THRESHOLD * secondary_sell_price:
                                 is_command_group = False
                                 # Handle group order
                                 quantity_group = calc_quantity_group_order(primary_msg['order_book'],
@@ -167,17 +167,17 @@ class Manager:
                                 quantity = min(
                                         quantity_group['quantity'],
                                         primary_amount_coin,
-                                        secondary_amount_usdt / secondary_sell_price
+                                        secondary_amount_usdt / secondary_sell_price,
+                                        MAX_TRADE_QUANTITY
                                     )
 
-                                quantity = min(quantity, 1443)
                                 cost_group_primary = calc_cost_group_order_by_quantity(primary_msg['order_book'],
                                                                                        quantity,
                                                                                        False)
                                 cost_group_secondary = calc_cost_group_order_by_quantity(secondary_msg['order_book'],
                                                                                          quantity,
                                                                                          True)
-                                if cost_group_primary > 1.006 * cost_group_secondary:
+                                if cost_group_primary > ARBITRAGE_THRESHOLD * cost_group_secondary:
                                     primary_order = ccxt_primary.create_market_sell_order(convert_coin(coin_trade, True), quantity)
 
                                     if shared_ccxt_manager.get_exchange(False).exchange_code == ExchangesCode.GATE.value:
@@ -255,7 +255,7 @@ class Manager:
                                         __pending_queue.put(msg_transaction)
 
                             # Bán sàn bingx, mua gate
-                            elif secondary_buy_price > 1.006 * primary_sell_price:
+                            elif secondary_buy_price > ARBITRAGE_THRESHOLD * primary_sell_price:
                                 is_command_group = False
                                 # Handle group order
                                 quantity_group = calc_quantity_group_order(primary_msg['order_book'],
@@ -265,10 +265,10 @@ class Manager:
                                 quantity = min(
                                         quantity_group['quantity'],
                                         secondary_amount_coin,
-                                        primary_amount_usdt / primary_sell_price
+                                        primary_amount_usdt / primary_sell_price,
+                                        MAX_TRADE_QUANTITY
                                     )
 
-                                quantity = min(quantity, 1443)
                                 # Bán sàn bingx, mua gate cost_group_secondary
                                 cost_group_primary = calc_cost_group_order_by_quantity(primary_msg['order_book'],
                                                                                        quantity,
@@ -276,7 +276,7 @@ class Manager:
                                 cost_group_secondary = calc_cost_group_order_by_quantity(secondary_msg['order_book'],
                                                                                          quantity,
                                                                                          False)
-                                if cost_group_secondary > 1.006 * cost_group_primary:
+                                if cost_group_secondary > ARBITRAGE_THRESHOLD * cost_group_primary:
                                     if shared_ccxt_manager.get_exchange(True).exchange_code == ExchangesCode.GATE.value:
                                         # ccxt_primary['options']['createMarketBuyOrderRequiresPrice'] = False
                                         primary_order = ccxt_primary.create_market_buy_order(convert_coin(coin_trade, True), cost_group_primary)
