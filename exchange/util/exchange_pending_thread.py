@@ -94,34 +94,44 @@ class ExchangePendingThread:
                                 elif side_secondary == 'buy' and side_primary == 'sell':
                                     profit = round((cost_primary - cost_secondary), 4)
                                 total_profit = round((total_profit + profit), 4)
-                                bot_tele.send_message(CHAT_ID, "Buy sell success: {0} => total: {1}".format(profit,
-                                                                                                            total_profit))
+                                msg = (
+                                    f"✅ Trade Completed\n"
+                                    f"- {primary_exchange_code} | OrderID: {primary_transaction.order_id} | Side: {side_primary} | Status: {primary_order_status['status']}\n"
+                                    f"- {secondary_exchange_code} | OrderID: {secondary_transaction.order_id} | Side: {side_secondary} | Status: {secondary_order_status['status']}\n"
+                                    f"Profit (this trade): {profit}\n"
+                                    f"Total Profit: {total_profit}"
+                                )
+                                bot_tele.send_message(CHAT_ID, msg)
                             else:
-                                msg = "Canceled "
-                                #if is_order_pending(primary_order_status):
-                                #    primary_ccxt_manager.cancel_order(primary_transaction.order_id, symbol)
-                                #    msg = msg + " primary {0} / status: {1}".format(primary_transaction.total, primary_order_status['status'])
-                                #elif is_order_pending(secondary_order_status):
-                                #    secondary_ccxt_manager.cancel_order(secondary_transaction.order_id, symbol)
-                                #    msg = msg + " secondary {0} / status: {1}".format(secondary_transaction.total, secondary_order_status['status'])
                                 if is_order_pending(primary_order_status) and is_order_pending(secondary_order_status):
                                     # Cancel primary order
                                     primary_ccxt_manager.cancel_order(primary_transaction.order_id, symbol)
                                     # Cancel secondary order  
                                     secondary_ccxt_manager.cancel_order(secondary_transaction.order_id, symbol)
+
                                     # Update message với thông tin cả 2 orders
-                                    msg = msg + " primary {0} / status: {1}, secondary {2} / status: {3}".format(
-                                        primary_transaction.total, 
-                                        primary_order_status['status'],
-                                        secondary_transaction.total,
-                                        secondary_order_status['status']
+                                    msg = (
+                                        f"❌ Cancel Orders\n"
+                                        f"- {primary_exchange_code} | OrderID: {primary_transaction.order_id} | "
+                                        f"Total: {primary_transaction.total} | Status: {primary_order_status['status']}\n"
+                                        f"- {secondary_exchange_code} | OrderID: {secondary_transaction.order_id} | "
+                                        f"Total: {secondary_transaction.total} | Status: {secondary_order_status['status']}\n"
                                     )
 
-                                amount = min(filled_primary, filled_secondary)
-                                profit = abs(round(amount * price_primary - amount * price_secondary, 4))
-                                total_profit = round((total_profit + profit), 4)
-                                msg = msg + " => total: {0}".format(total_profit)
-                                msg = msg + "=> status: {0}/{1}".format(primary_order_status['status'], secondary_order_status['status'])
+                                else:
+                                    amount = min(filled_primary, filled_secondary)
+                                    profit = abs(round(amount * price_primary - amount * price_secondary, 4))
+                                    total_profit = round((total_profit + profit), 4)
+
+                                    msg = (
+                                        f"⏳ Pending Orders\n"
+                                        f"- {primary_exchange_code} | OrderID: {primary_transaction.order_id} | Status: {primary_order_status['status']}\n"
+                                        f"- {secondary_exchange_code} | OrderID: {secondary_transaction.order_id} | Status: {secondary_order_status['status']}\n"
+                                        f"Amount Filled: {amount}\n"
+                                        f"Profit (this round): {profit}\n"
+                                        f"Total Profit: {total_profit}\n"
+                                    )
+
                                 bot_tele.send_message(CHAT_ID, msg)
                         except Exception as err:
                             print("Error: {0}".format(err))
