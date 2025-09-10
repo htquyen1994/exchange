@@ -13,9 +13,11 @@ import telebot
 from time import gmtime, strftime
 
 from exchange.util.log_agent import LoggerAgent
+import traceback
 
 CHAT_ID = "-4602382105"
 CHAT_WARNING_ID = "-4869126380"
+CHAT_ERROR_ID = "-4669495904"
 
 
 
@@ -159,15 +161,14 @@ class Manager:
                                 is_command_group = False
                                 # Handle group order
                                 quantity_group = calc_quantity_group_order(primary_msg['order_book'],
-                                                                           secondary_msg['order_book'],
-                                                                           False)
+                                                                          secondary_msg['order_book'],
+                                                                          False)
 
-                                quantity = min(min(
-                                    min(
-                                        primary_buy_price * quantity_group['quantity'],
-                                        secondary_sell_price * quantity_group['quantity']) / primary_buy_price,
-                                    primary_amount_coin,
-                                    secondary_amount_coin), (min(primary_amount_usdt, secondary_amount_usdt) / secondary_sell_price))
+                                quantity = min(
+                                        quantity_group['quantity'],
+                                        primary_amount_coin,
+                                        secondary_amount_usdt / secondary_sell_price
+                                    )
 
                                 quantity = min(quantity, 1443)
                                 cost_group_primary = calc_cost_group_order_by_quantity(primary_msg['order_book'],
@@ -206,12 +207,11 @@ class Manager:
                                     #         secondary_amount_usdt) / primary_buy_price, primary_amount_coin,
                                     #     secondary_amount_coin), (3.1 / secondary_sell_price))
                                     quantity = min(
-                                        min(
-                                            primary_buy_price * primary_buy_quantity,
-                                            secondary_sell_price * secondary_sell_quantity,
-                                            primary_amount_usdt,
-                                            secondary_amount_usdt) / primary_buy_price, primary_amount_coin,
-                                        secondary_amount_coin)
+                                            primary_buy_quantity,
+                                            secondary_sell_quantity,
+                                            primary_amount_coin,
+                                            secondary_amount_usdt / secondary_sell_price
+                                        )
                                     checked = quantity * secondary_sell_price;
                                     if  checked < 3.2:
                                         bot.send_message(CHAT_ID, "Volumn small, SKIP")
@@ -262,12 +262,11 @@ class Manager:
                                                                            secondary_msg['order_book'],
                                                                            True)
 
-                                quantity = min(min(
-                                    min(
-                                        secondary_buy_price * quantity_group['quantity'],
-                                        primary_sell_price * quantity_group['quantity']) / secondary_buy_price,
-                                    primary_amount_coin,
-                                    secondary_amount_coin), (min(primary_amount_usdt, secondary_amount_usdt) / primary_sell_price))
+                                quantity = min(
+                                        quantity_group['quantity'],
+                                        secondary_amount_coin,
+                                        primary_amount_usdt / primary_sell_price
+                                    )
 
                                 quantity = min(quantity, 1443)
                                 # Bán sàn bingx, mua gate cost_group_secondary
@@ -304,11 +303,11 @@ class Manager:
                                     is_command_group = True
                                 if not is_command_group:
                                     quantity = min(
-                                        min(secondary_buy_price * secondary_buy_quantity,
-                                            primary_sell_price * primary_sell_quantity,
-                                            secondary_amount_usdt,
-                                            primary_amount_usdt) / secondary_buy_price, secondary_amount_coin,
-                                        primary_amount_coin)
+                                            primary_buy_quantity,
+                                            secondary_sell_quantity,
+                                            secondary_amount_coin,
+                                            primary_amount_usdt / primary_sell_price
+                                        )
                                     checked = quantity * primary_sell_price;
                                     if  checked < 3.2:
                                         bot.send_message(CHAT_ID, "Volumn small, SKIP")
@@ -363,28 +362,14 @@ class Manager:
                                     bot.send_message(CHAT_ID, "Trading status is waiting - not match")
                                     current_time = datetime.datetime.now()
                         except Exception as ex:
-                            print("Error manager 0:  {}".format(ex.__str__()))
-                            # logger.info("Error manager 1: {0}".format(ex))
-                            try:
-                                if (datetime.datetime.now() - current_time).total_seconds() >= 300:
-                                    bot.send_message(CHAT_ID, "Error manager")
-                                    current_time = datetime.datetime.now()
-                            except Exception as ex:
-                                print("Error:  {}".format(ex))
+                            print("Error manager 0: {}".format(str(ex)))
+                            send_error_telegram(ex, "Inner Trading Loop", bot)
+
                     else:
                         sleep(0.5)
                 except Exception as ex:
-                    print("Error:  {}".format(ex))
-                    # logger.info("Error manager 2: {0}".format(ex))
-                    try:
-                        if (datetime.datetime.now() - current_time).total_seconds() >= 300:
-                            bot.send_message(CHAT_ID, "Error manager")
-                            current_time = datetime.datetime.now()
-                        else:
-                            sleep(1)
-                    except Exception as ex:
-                        # logger.info("Send chat box error".format(ex))
-                        print("Send chat box error {0}".format(ex))
+                    print("Error: {}".format(str(ex)))
+                    send_error_telegram(ex, "Main Trading Loop", bot)
 
             if not self.start_event.is_set():
                 try:
@@ -557,3 +542,24 @@ def calc_cost_group_order_by_quantity(order, quantity, is_buy):
                 order['bids'][2][0] * ok_q3 +
                 order['bids'][3][0] * ok_q4 +
                 order['bids'][4][0] * ok_q5)
+
+def send_error_telegram(ex, context="", bot=None):
+    if bot is None:
+        return
+    try:
+        tb = traceback.format_exc()  # lấy stack trace
+        telegram_msg = f"""🚨 ERROR ALERT 🚨
+
+Context: {context}
+Error Type: {type(ex).__name__}
+Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+Error Message:
+{str(ex)}
+
+Traceback:
+{tb}"""
+        bot.send_message(CHAT_ERROR_ID, telegram_msg)
+    except Exception as telegram_ex:
+        print("Failed to send telegram: {}".format(str(telegram_ex)))
+
