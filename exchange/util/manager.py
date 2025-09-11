@@ -366,8 +366,7 @@ class Manager:
                             print("Error manager 0: {}".format(str(ex)))
                             send_error_telegram(ex, "Inner Trading Loop", bot)
 
-                    else:
-                        sleep(0.5)
+                    sleep(0.5)
                 except Exception as ex:
                     print("Error: {}".format(str(ex)))
                     send_error_telegram(ex, "Main Trading Loop", bot)
