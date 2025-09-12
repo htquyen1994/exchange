@@ -424,11 +424,11 @@ def get_balance(shared_ccxt_manager, is_primary):
     orderbook = ccxt.fetch_order_book(coin)
     param_object['order_book'] = orderbook
     balance = ccxt.fetch_balance()
-    if balance is not None and balance['total'] is not None:
+    if balance is not None and balance['free'] is not None:
         param_object['balance'] = {}
         param_object['balance']['amount_usdt'] = float(0)
         param_object['balance']['amount_coin'] = float(0)
-        for currency, amount in balance['total'].items():
+        for currency, amount in balance['free'].items():
             if currency == "USDT":
                 param_object['balance']['amount_usdt'] = float(amount)
             if currency == coin.split('/')[0]:
