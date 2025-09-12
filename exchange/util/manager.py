@@ -106,8 +106,10 @@ class Manager:
                         sleep(1)
                         initialize = True
                     # print("=====Execute time main {0}".format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-                    primary_msg = get_balance(shared_ccxt_manager, True)
-                    secondary_msg = get_balance(shared_ccxt_manager, False)
+                    primary_msg, secondary_msg = execute_orders_concurrently(
+                        lambda: get_balance(shared_ccxt_manager, True),
+                        lambda: get_balance(shared_ccxt_manager, False)
+                    )
                     primary_min_notional = get_min_notional(shared_ccxt_manager.get_exchange(True).exchange_code)
                     secondary_min_notional = get_min_notional(shared_ccxt_manager.get_exchange(False).exchange_code)
                     
