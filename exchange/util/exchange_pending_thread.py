@@ -80,8 +80,8 @@ class ExchangePendingThread:
                             #         secondary_order_status = secondary_ccxt_manager.fetch_closed_order(
                             #             primary_transaction.order_id, symbol)
 
-                            filled_primary = primary_order_status['filled']
-                            filled_secondary = secondary_order_status['filled']
+                            filled_primary = get_filled_size(primary_order_status)
+                            filled_secondary = get_filled_size(secondary_order_status)
                             price_primary = primary_order_status['price']
                             price_secondary = secondary_order_status['price']
                             side_primary = primary_order_status['side']
@@ -98,10 +98,11 @@ class ExchangePendingThread:
                                 total_profit = round((total_profit + profit), 4)
                                 msg = (
                                     f"✅ Trade Completed\n"
-                                    f"{primary_exchange_code.upper()} | OrderID: {primary_transaction.order_id} | Side: {side_primary} | Status: {primary_order_status['status']}\n"
-                                    f"{secondary_exchange_code.upper()} | OrderID: {secondary_transaction.order_id} | Side: {side_secondary} | Status: {secondary_order_status['status']}\n"
+                                    f"{primary_exchange_code.upper()} | Side: {side_primary} | Status: {primary_order_status['status']}\n"
+                                    f"{secondary_exchange_code.upper()} | Side: {side_secondary} | Status: {secondary_order_status['status']}\n"
                                     f"Amount: {amount}\n"
                                     f"Profit: {profit}\n"
+                                    f"Total Profit: {total_profit}\n"
                                 )
                                 bot_tele.send_message(CHAT_ID, msg)
                             else:
@@ -113,10 +114,11 @@ class ExchangePendingThread:
 
                                     msg = (
                                         f"❌ Cancel Orders\n"
-                                        f"{primary_exchange_code.upper()} | OrderID: {primary_transaction.order_id} | "
+                                        f"{primary_exchange_code.upper()} |"
                                         f"Total: {primary_transaction.total}\n"
-                                        f"{secondary_exchange_code.upper()} | OrderID: {secondary_transaction.order_id} | "
+                                        f"{secondary_exchange_code.upper()} |"
                                         f"Total: {secondary_transaction.total}\n"
+                                        f"Total Profit: {total_profit}\n"
                                     )
 
                                 else:
@@ -125,10 +127,11 @@ class ExchangePendingThread:
 
                                     msg = (
                                         f"⏳ Pending Orders\n"
-                                        f"{primary_exchange_code.upper()} | OrderID: {primary_transaction.order_id} | Status: {primary_order_status['status']}\n"
-                                        f"{secondary_exchange_code.upper()} | OrderID: {secondary_transaction.order_id} | Status: {secondary_order_status['status']}\n"
+                                        f"{primary_exchange_code.upper()} | Status: {primary_order_status['status']}\n"
+                                        f"{secondary_exchange_code.upper()} | Status: {secondary_order_status['status']}\n"
                                         f"Amount: {amount}\n"
                                         f"Profit: {profit}\n"
+                                        f"Total Profit: {total_profit}\n"
                                     )
 
                                 bot_tele.send_message(CHAT_ID, msg)
@@ -153,6 +156,13 @@ def get_total_cost(exchange_code, order):
         return float(order['info']['cummulativeQuoteQty'])
     if exchange_code == ExchangesCode.BITMART.value:
         return float(order['info']['filledNotional'])
+    
+
+
+def get_filled_size(exchange_code, order):
+    if exchange_code == ExchangesCode.BITMART.value:
+        return float(order['info']['filledSize'])
+    return order['filled']
     
 def is_order_completed(order_status):
     status = order_status['status'].lower()
