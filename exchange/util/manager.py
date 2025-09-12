@@ -14,11 +14,12 @@ from time import gmtime, strftime
 
 from exchange.util.log_agent import LoggerAgent
 import traceback
+from exchange.util.order_executor import execute_orders_concurrently
 
 CHAT_ID = "-4602382105"
 CHAT_WARNING_ID = "-4869126380"
 CHAT_ERROR_ID = "-4669495904"
-ARBITRAGE_THRESHOLD = 1.016
+ARBITRAGE_THRESHOLD = 1.012
 MAX_TRADE_QUANTITY = 1443
 
 class Manager:
@@ -146,8 +147,8 @@ class Manager:
                             temp2 = (primary_amount_coin * primary_buy_price) < 10
                             if secondary_amount_usdt < 10 or primary_amount_usdt < 10 or temp1 or temp2:
                                 msg = "Warning exchange {0}/{1}".format(
-                                    shared_ccxt_manager.get_exchange(False).exchange_code,
-                                    shared_ccxt_manager.get_exchange(True).exchange_code
+                                    shared_ccxt_manager.get_exchange(True).exchange_code,
+                                    shared_ccxt_manager.get_exchange(False).exchange_code
                                 )
 
                                 msg = msg + "\n COIN {0} / {1}".format(primary_amount_coin, secondary_amount_coin)
@@ -178,14 +179,20 @@ class Manager:
                                                                                          quantity,
                                                                                          True)
                                 if cost_group_primary > ARBITRAGE_THRESHOLD * cost_group_secondary:
-                                    primary_order = ccxt_primary.create_market_sell_order(convert_coin(coin_trade, True), quantity)
+                                    # primary_order = ccxt_primary.create_market_sell_order(convert_coin(coin_trade, True), quantity)
 
                                     if shared_ccxt_manager.get_exchange(False).exchange_code in [ExchangesCode.GATE.value, ExchangesCode.BITMART.value]:
                                     
                                         # ccxt_secondary['options']['createMarketBuyOrderRequiresPrice'] = False
-                                        secondary_order = ccxt_secondary.create_market_buy_order(coin_trade, cost_group_primary)
+                                        primary_order, secondary_order = execute_orders_concurrently(
+                                            lambda: ccxt_primary.create_market_sell_order(convert_coin(coin_trade, True), quantity),
+                                            lambda: ccxt_secondary.create_market_buy_order(coin_trade, cost_group_primary)
+                                        )
                                     else:
-                                        secondary_order = ccxt_secondary.create_market_buy_order(coin_trade, quantity)
+                                        primary_order, secondary_order = execute_orders_concurrently(
+                                            lambda: ccxt_primary.create_market_sell_order(convert_coin(coin_trade, True), quantity),
+                                            lambda: ccxt_secondary.create_market_buy_order(coin_trade, quantity)
+                                        )
                                     order_mgs_primary = round(cost_group_primary, 2)
                                     order_mgs_secondary = round(cost_group_secondary, 2)
                                     primary_pending_order = OrderStatus(True,
@@ -230,13 +237,10 @@ class Manager:
                                                                                        quantity * primary_buy_price)
                                         bot.send_message(CHAT_WARNING_ID, msg)
                                     else:
-                                        # print("Buy primary and sell secondary", quantity)
-                                        primary_order = ccxt_primary.create_limit_sell_order(convert_coin(coin_trade, True),
-                                                                                             quantity,
-                                                                                             primary_buy_price)
-                                        secondary_order = ccxt_secondary.create_limit_buy_order(coin_trade,
-                                                                                                quantity,
-                                                                                                secondary_sell_price)
+                                        primary_order, secondary_order = execute_orders_concurrently(
+                                            lambda: ccxt_primary.create_limit_sell_order(convert_coin(coin_trade, True), quantity, primary_buy_price),
+                                            lambda: ccxt_secondary.create_limit_buy_order(coin_trade, quantity, secondary_sell_price)
+                                        )
                                         # print("Call 1 => {0} / {1}".format(primary_order['id'], secondary_order['id']))
                                         # handle_exchange_order_transaction(bot,
                                         #                                   ccxt_primary, ccxt_secondary,
@@ -279,11 +283,16 @@ class Manager:
                                                                                          False)
                                 if cost_group_secondary > ARBITRAGE_THRESHOLD * cost_group_primary:
                                     if shared_ccxt_manager.get_exchange(True).exchange_code in [ExchangesCode.GATE.value, ExchangesCode.BITMART.value]:
-                                        # ccxt_primary['options']['createMarketBuyOrderRequiresPrice'] = False
-                                        primary_order = ccxt_primary.create_market_buy_order(convert_coin(coin_trade, True), cost_group_primary)
+                                        primary_order, secondary_order = execute_orders_concurrently(
+                                            lambda: ccxt_primary.create_market_buy_order(convert_coin(coin_trade, True), cost_group_primary),
+                                            lambda: ccxt_secondary.create_market_sell_order(coin_trade, quantity)
+                                        )
+
                                     else:
-                                        primary_order = ccxt_primary.create_market_buy_order(convert_coin(coin_trade, True), quantity)
-                                    secondary_order = ccxt_secondary.create_market_sell_order(coin_trade, quantity)
+                                        primary_order, secondary_order = execute_orders_concurrently(
+                                            lambda: ccxt_primary.create_market_buy_order(convert_coin(coin_trade, True), quantity),
+                                            lambda: ccxt_secondary.create_market_sell_order(coin_trade, quantity)
+                                        )
                                     order_mgs_primary = round(cost_group_primary, 2)
                                     order_mgs_secondary = round(cost_group_secondary, 2)
                                     print("2====> buy primary, sell secondary {0} => {1}".format(cost_group_primary,
@@ -331,13 +340,10 @@ class Manager:
                                                                                       quantity * secondary_buy_price)
                                         bot.send_message(CHAT_WARNING_ID, msg)
                                     else:
-                                        # print("Buy primary and sell secondary", quantity)
-                                        primary_order = ccxt_primary.create_limit_buy_order(convert_coin(coin_trade, True),
-                                                                                            quantity,
-                                                                                            primary_sell_price)
-                                        secondary_order = ccxt_secondary.create_limit_sell_order(coin_trade,
-                                                                                                 quantity,
-                                                                                                 secondary_buy_price)
+                                        primary_order, secondary_order = execute_orders_concurrently(
+                                            lambda: ccxt_primary.create_limit_buy_order(convert_coin(coin_trade, True), quantity, primary_sell_price),
+                                            lambda: ccxt_secondary.create_limit_sell_order(coin_trade, quantity, secondary_buy_price)
+                                        )
                                         # handle_exchange_order_transaction(bot,
                                         #                                   ccxt_primary, ccxt_secondary,
                                         #                                   primary_order['id'], secondary_order['id'],

@@ -2,6 +2,7 @@ from datetime import time
 from threading import Thread
 from time import sleep
 from time import gmtime, strftime
+from exchange.util.order_executor import execute_orders_concurrently
 
 from config.config import ExchangesCode
 from exchange.util.ccxt_manager import CcxtManager
@@ -105,18 +106,17 @@ class ExchangePendingThread:
                                 bot_tele.send_message(CHAT_ID, msg)
                             else:
                                 if is_order_pending(primary_order_status) and is_order_pending(secondary_order_status):
-                                    # Cancel primary order
-                                    primary_ccxt_manager.cancel_order(primary_transaction.order_id, symbol)
-                                    # Cancel secondary order  
-                                    secondary_ccxt_manager.cancel_order(secondary_transaction.order_id, symbol)
+                                    execute_orders_concurrently(
+                                        lambda: primary_ccxt_manager.cancel_order(primary_transaction.order_id, symbol),
+                                        lambda: secondary_ccxt_manager.cancel_order(secondary_transaction.order_id, symbol)
+                                    )  
 
-                                    # Update message với thông tin cả 2 orders
                                     msg = (
                                         f"❌ Cancel Orders\n"
                                         f"{primary_exchange_code.upper()} | OrderID: {primary_transaction.order_id} | "
-                                        f"Total: {primary_transaction.total} | Status: {primary_order_status['status']}\n"
+                                        f"Total: {primary_transaction.total}\n"
                                         f"{secondary_exchange_code.upper()} | OrderID: {secondary_transaction.order_id} | "
-                                        f"Total: {secondary_transaction.total} | Status: {secondary_order_status['status']}\n"
+                                        f"Total: {secondary_transaction.total}\n"
                                     )
 
                                 else:
