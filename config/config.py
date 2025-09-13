@@ -1,5 +1,7 @@
+import os
 from enum import Enum
-
+from dotenv import load_dotenv
+load_dotenv()
 
 class AppConfig:
     VERSION = "20200506"
@@ -18,6 +20,10 @@ class TradeSetting:
     SIMULATOR = True
     TIME_GET_ORDER_BOOK = 10
     EXCHANGES = ['binance', 'okex', 'gate', 'houbi', 'bybit', 'kucoin', 'bitget', 'mexc']
+
+    ARBITRAGE_THRESHOLD = float(os.getenv("ARBITRAGE_THRESHOLD"))
+    MAX_TRADE_QUANTITY = int(os.getenv("MAX_TRADE_QUANTITY"))
+
 
 
 class Message(Enum):
@@ -39,3 +45,18 @@ class ExchangesCode(Enum):
     BITGET = 'bitget'
     MEXC = 'mexc'
     BITMART = 'bitmart'
+
+class ExchangeNotionalSetting:
+    """Min notional value required per exchange"""
+    MIN = {
+        "BITMART": 5.0,
+        "MEXC": 1.0,
+        "DEFAULT": 1.0
+    }
+
+class TelegramSetting:
+    TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+    CHAT_ID = os.getenv("CHAT_ID")
+    CHAT_WARNING_ID = os.getenv("CHAT_WARNING_ID")
+    CHAT_ERROR_ID = os.getenv("CHAT_ERROR_ID")
+

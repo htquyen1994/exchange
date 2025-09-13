@@ -1,15 +1,13 @@
-from datetime import time
 from threading import Thread
 from time import sleep
 from time import gmtime, strftime
 from exchange.util.order_executor import execute_orders_concurrently
 
-from config.config import ExchangesCode
+from config.config import ExchangesCode, TelegramSetting
 from exchange.util.ccxt_manager import CcxtManager
 import telebot
 
 initialize = False
-CHAT_ID = "-4602382105"
 
 
 class ExchangePendingThread:
@@ -104,7 +102,7 @@ class ExchangePendingThread:
                                     f"Profit: {profit}\n"
                                     f"Total Profit: {total_profit}\n"
                                 )
-                                bot_tele.send_message(CHAT_ID, msg)
+                                bot_tele.send_message(TelegramSetting.CHAT_ID, msg)
                             else:
                                 if is_order_pending(primary_order_status) and is_order_pending(secondary_order_status):
                                     execute_orders_concurrently(
@@ -134,7 +132,7 @@ class ExchangePendingThread:
                                         f"Total Profit: {total_profit}\n"
                                     )
 
-                                bot_tele.send_message(CHAT_ID, msg)
+                                bot_tele.send_message(TelegramSetting.CHAT_ID, msg)
                         except Exception as err:
                             print("Error: {0}".format(err))
                 else:

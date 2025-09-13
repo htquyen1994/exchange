@@ -53,5 +53,5 @@ Flask-Cors==4.0.0
 ccxt==4.3.8
 Telethon==1.35.0
 pyTelegramBotAPI==4.17.0
-
+python-dotenv==1.1.1
 

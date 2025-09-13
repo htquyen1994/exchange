@@ -3,30 +3,17 @@ import multiprocessing
 from multiprocessing import Process, Event, Queue
 from time import sleep
 
-from config.config import ExchangesCode
+from config.config import ExchangesCode, TradeSetting, TelegramSetting, ExchangeNotionalSetting
 from exchange.models.order_status import OrderStatus
 from exchange.util.ccxt_manager import CcxtManager
 from exchange.util.exchange_pending_thread import ExchangePendingThread
 from exchange.util.exchange_thread import ExchangeThread
-import uuid
 import telebot
 from time import gmtime, strftime
 
 from exchange.util.log_agent import LoggerAgent
 import traceback
 from exchange.util.order_executor import execute_orders_concurrently
-
-CHAT_ID = "-4602382105"
-CHAT_WARNING_ID = "-4869126380"
-CHAT_ERROR_ID = "-4669495904"
-ARBITRAGE_THRESHOLD = 1.0109
-MAX_TRADE_QUANTITY = 1443
-
-EXCHANGE_MIN_NOTIONAL = {
-    "BITMART": 5.0,
-    "MEXC": 1.0,
-    "DEFAULT": 1.0
-}
 
 class Manager:
     start_flag = True
@@ -88,7 +75,7 @@ class Manager:
         self.queue_config.put(ccxt)
 
     def do_work(self, queue_config):
-        bot = telebot.TeleBot("7556592362:AAEeJHXweydtsOYYH7KX_d2QyqFQOPNAwm4")
+        bot = telebot.TeleBot(TelegramSetting.TOKEN)
         current_time = datetime.datetime.now()
 
         while True:
@@ -165,11 +152,11 @@ class Manager:
                                 msg = msg + "\n COIN {0} / {1}".format(primary_amount_coin, secondary_amount_coin)
                                 msg = msg + "\n USDT {0} / {1}".format(primary_amount_usdt, secondary_amount_usdt)
 
-                                bot.send_message(CHAT_WARNING_ID, msg)
+                                bot.send_message(TelegramSetting.CHAT_WARNING_ID, msg)
                                 sleep(20)
                                 continue
                             # ban san primary (gate) bids, mua secondary (bingx): ask
-                            if primary_buy_price > ARBITRAGE_THRESHOLD * secondary_sell_price:
+                            if primary_buy_price > TradeSetting.ARBITRAGE_THRESHOLD * secondary_sell_price:
                                 is_command_group = False
                                 # Handle group order
                                 quantity_group = calc_quantity_group_order(primary_msg['order_book'],
@@ -180,7 +167,7 @@ class Manager:
                                         quantity_group['quantity'],
                                         primary_amount_coin,
                                         secondary_amount_usdt / secondary_sell_price,
-                                        MAX_TRADE_QUANTITY
+                                        TradeSetting.MAX_TRADE_QUANTITY
                                     )
 
                                 cost_group_primary = calc_cost_group_order_by_quantity(primary_msg['order_book'],
@@ -189,7 +176,7 @@ class Manager:
                                 cost_group_secondary = calc_cost_group_order_by_quantity(secondary_msg['order_book'],
                                                                                          quantity,
                                                                                          True)
-                                if cost_group_primary > ARBITRAGE_THRESHOLD * cost_group_secondary:
+                                if cost_group_primary > TradeSetting.ARBITRAGE_THRESHOLD * cost_group_secondary:
                                     # primary_order = ccxt_primary.create_market_sell_order(convert_coin(coin_trade, True), quantity)
 
                                     if secondary_code in [ExchangesCode.GATE.value, ExchangesCode.BITMART.value]:
@@ -234,7 +221,7 @@ class Manager:
                                     checked = quantity * secondary_sell_price;
                                     if  checked <= min_notional:
                                         if (datetime.datetime.now() - current_time).total_seconds() >= 600:
-                                            bot.send_message(CHAT_ID, "Volumn small, SKIP")
+                                            bot.send_message(TelegramSetting.CHAT_ID, "Volumn small, SKIP")
                                             current_time = datetime.datetime.now()
                                         sleep(0.1)
                                         continue
@@ -249,7 +236,7 @@ class Manager:
                                                                                      quantity * primary_buy_price)
                                         msg = msg + "Second sell: {0} => {1}\n".format(secondary_sell_price,
                                                                                        quantity * primary_buy_price)
-                                        bot.send_message(CHAT_WARNING_ID, msg)
+                                        bot.send_message(TelegramSetting.CHAT_WARNING_ID, msg)
                                     else:
                                         primary_order, secondary_order = execute_orders_concurrently(
                                             lambda: ccxt_primary.create_limit_sell_order(convert_coin(coin_trade, True), quantity, primary_buy_price),
@@ -274,7 +261,7 @@ class Manager:
                                         __pending_queue.put(msg_transaction)
 
                             # Bán sàn bingx, mua gate
-                            elif secondary_buy_price > ARBITRAGE_THRESHOLD * primary_sell_price:
+                            elif secondary_buy_price > TradeSetting.ARBITRAGE_THRESHOLD * primary_sell_price:
                                 is_command_group = False
                                 # Handle group order
                                 quantity_group = calc_quantity_group_order(primary_msg['order_book'],
@@ -285,7 +272,7 @@ class Manager:
                                         quantity_group['quantity'],
                                         secondary_amount_coin,
                                         primary_amount_usdt / primary_sell_price,
-                                        MAX_TRADE_QUANTITY
+                                        TradeSetting.MAX_TRADE_QUANTITY
                                     )
 
                                 # Bán sàn bingx, mua gate cost_group_secondary
@@ -295,7 +282,7 @@ class Manager:
                                 cost_group_secondary = calc_cost_group_order_by_quantity(secondary_msg['order_book'],
                                                                                          quantity,
                                                                                          False)
-                                if cost_group_secondary > ARBITRAGE_THRESHOLD * cost_group_primary:
+                                if cost_group_secondary > TradeSetting.ARBITRAGE_THRESHOLD * cost_group_primary:
                                     if primary_code in [ExchangesCode.GATE.value, ExchangesCode.BITMART.value]:
                                         primary_order, secondary_order = execute_orders_concurrently(
                                             lambda: ccxt_primary.create_market_buy_order(convert_coin(coin_trade, True), cost_group_primary),
@@ -335,7 +322,7 @@ class Manager:
                                     checked = quantity * primary_sell_price;
                                     if  checked <= min_notional:
                                         if (datetime.datetime.now() - current_time).total_seconds() >= 600:
-                                            bot.send_message(CHAT_ID, "Volumn small, SKIP")
+                                            bot.send_message(TelegramSetting.CHAT_ID, "Volumn small, SKIP")
                                             current_time = datetime.datetime.now()
                                         sleep(0.1)
                                         continue
@@ -355,7 +342,7 @@ class Manager:
                                                                                       quantity * primary_sell_price)
                                         msg = msg + "Second buy: {0} => {1}\n".format(secondary_buy_price,
                                                                                       quantity * secondary_buy_price)
-                                        bot.send_message(CHAT_WARNING_ID, msg)
+                                        bot.send_message(TelegramSetting.CHAT_WARNING_ID, msg)
                                     else:
                                         primary_order, secondary_order = execute_orders_concurrently(
                                             lambda: ccxt_primary.create_limit_buy_order(convert_coin(coin_trade, True), quantity, primary_sell_price),
@@ -383,7 +370,7 @@ class Manager:
                                 sleep(0.1)
                                 print("Waiting...")
                                 if (datetime.datetime.now() - current_time).total_seconds() >= 600:
-                                    bot.send_message(CHAT_ID, "Trading status is waiting - not match")
+                                    bot.send_message(TelegramSetting.CHAT_ID, "Trading status is waiting - not match")
                                     current_time = datetime.datetime.now()
                         except Exception as ex:
                             print("Error manager 0: {}".format(str(ex)))
@@ -400,7 +387,7 @@ class Manager:
                         __pending_thread.stop_job()
 
                     if (datetime.datetime.now() - current_time).total_seconds() >= 300:
-                        bot.send_message(CHAT_ID, "Trading is not start")
+                        bot.send_message(TelegramSetting.CHAT_ID, "Trading is not start")
                         current_time = datetime.datetime.now()
                 except Exception as ex:
                     # logger.info("Send chat box error".format(ex))
@@ -410,7 +397,7 @@ class Manager:
             # logger.info("Process is running")
             try:
                 if (datetime.datetime.now() - current_time).total_seconds() >= 300:
-                    bot.send_message(CHAT_ID, "Process is stopped")
+                    bot.send_message(TelegramSetting.CHAT_ID, "Process is stopped")
                     current_time = datetime.datetime.now()
             except Exception as ex:
                 print("Send chat box error {0}".format(ex))
@@ -456,19 +443,19 @@ def handle_exchange_order_transaction(bot, exchange_primary, exchange_secondary,
             secondary_order_status = exchange_secondary.fetch_order(secondary_order_id, symbol)
             # print("Order status {0} / {1} ".format(primary_order_status['status'], secondary_order_status['status']))
             if primary_order_status['status'] == 'closed' and secondary_order_status['status'] == 'closed':
-                bot.send_message(CHAT_ID, "Buy sell success")
+                bot.send_message(TelegramSetting.CHAT_ID, "Buy sell success")
                 # count = count + 1
                 # continue
             else:
                 if primary_order_status['status'] == 'open' or primary_order_status is None:
                     result = exchange_primary.cancel_order(primary_order_id, symbol)
                     msg = "Command cancel buy/sell at primary"
-                    bot.send_message(CHAT_ID, msg)
+                    bot.send_message(TelegramSetting.CHAT_ID, msg)
 
                 if secondary_order_status['status'] == 'open' or secondary_order_status is None:
                     result = exchange_secondary.cancel_order(secondary_order_id, symbol)
                     msg = "Command cancel buy/sell at secondary"
-                    bot.send_message(CHAT_ID, msg)
+                    bot.send_message(TelegramSetting.CHAT_ID, msg)
         except Exception as err:
             print("Error: {0}".format(err))
 
@@ -568,13 +555,13 @@ Error Message:
 
 Traceback:
 {tb}"""
-        bot.send_message(CHAT_ERROR_ID, telegram_msg)
+        bot.send_message(TelegramSetting.CHAT_ERROR_ID, telegram_msg)
     except Exception as telegram_ex:
         print("Failed to send telegram: {}".format(str(telegram_ex)))
 
 def get_min_notional(exchange_codes: list[str]) -> float:
     values = [
-        EXCHANGE_MIN_NOTIONAL.get(code.upper(), EXCHANGE_MIN_NOTIONAL["DEFAULT"])
+        ExchangeNotionalSetting.MIN.get(code.upper(), ExchangeNotionalSetting.MIN["DEFAULT"])
         for code in exchange_codes
     ]
-    return max(values) if values else EXCHANGE_MIN_NOTIONAL["DEFAULT"]
+    return max(values) if values else ExchangeNotionalSetting.MIN["DEFAULT"]
