@@ -112,8 +112,7 @@ class Manager:
                     )
                     primary_code = shared_ccxt_manager.get_exchange(True).exchange_code
                     secondary_code = shared_ccxt_manager.get_exchange(False).exchange_code
-                    primary_min_notional = get_min_notional(primary_code)
-                    secondary_min_notional = get_min_notional(secondary_code)
+                    min_notional = get_min_notional([primary_code, secondary_code])
                     
                     if primary_msg is not None and secondary_msg is not None:
                         try:
@@ -233,11 +232,11 @@ class Manager:
                                             secondary_amount_usdt / secondary_sell_price
                                         )
                                     checked = quantity * secondary_sell_price;
-                                    if  checked < 3.2:
+                                    if  checked <= min_notional:
                                         bot.send_message(CHAT_ID, "Volumn small, SKIP")
                                         continue
-                                    precision_invalid = (quantity * primary_buy_price) <= primary_min_notional or (
-                                            quantity * secondary_sell_price) <= secondary_min_notional
+                                    precision_invalid = (quantity * primary_buy_price) <= min_notional or (
+                                            quantity * secondary_sell_price) <= min_notional
                                     if precision_invalid:
                                         msg = "======PRECISION PRICE======\n"
                                         msg = msg + "USDT {0}/{1}\n".format(primary_amount_usdt, secondary_amount_usdt)
@@ -331,12 +330,12 @@ class Manager:
                                             primary_amount_usdt / primary_sell_price
                                         )
                                     checked = quantity * primary_sell_price;
-                                    if  checked < 3.2:
+                                    if  checked <= min_notional:
                                         bot.send_message(CHAT_ID, "Volumn small, SKIP")
                                         continue
 
-                                    precision_invalid = (quantity * secondary_buy_price) < secondary_min_notional or (
-                                            quantity * primary_sell_price) < primary_min_notional
+                                    precision_invalid = (quantity * secondary_buy_price) <= min_notional or (
+                                            quantity * primary_sell_price) <= min_notional
                                     if precision_invalid:
                                         msg = "======PRECISION PRICE======\n"
                                         msg = msg + "quantity: {0}\n".format(quantity)
@@ -567,5 +566,9 @@ Traceback:
     except Exception as telegram_ex:
         print("Failed to send telegram: {}".format(str(telegram_ex)))
 
-def get_min_notional(exchange_code: str) -> float:
-    return EXCHANGE_MIN_NOTIONAL.get(exchange_code.upper(), EXCHANGE_MIN_NOTIONAL["DEFAULT"])
+def get_min_notional(exchange_codes: list[str]) -> float:
+    values = [
+        EXCHANGE_MIN_NOTIONAL.get(code.upper(), EXCHANGE_MIN_NOTIONAL["DEFAULT"])
+        for code in exchange_codes
+    ]
+    return max(values) if values else EXCHANGE_MIN_NOTIONAL["DEFAULT"]
