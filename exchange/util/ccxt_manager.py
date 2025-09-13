@@ -28,6 +28,12 @@ def init_cctx_exchange(exchange):
         ccxt_exchange = ccxt.bitget(param)
     elif exchange_code == ExchangesCode.MEXC.value:
         ccxt_exchange = ccxt.mexc(param)
+    elif exchange_code == ExchangesCode.BITMART.value:
+        param['uid'] = 'exhange-tool'
+        param['options'] = {
+            'createMarketBuyOrderRequiresPrice': False
+        }
+        ccxt_exchange = ccxt.bitmart(param)
     elif exchange_code == ExchangesCode.BINGX.value:
         ccxt_exchange = ccxt.bingx(param)
     return ccxt_exchange
