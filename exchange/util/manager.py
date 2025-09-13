@@ -110,8 +110,10 @@ class Manager:
                         lambda: get_balance(shared_ccxt_manager, True),
                         lambda: get_balance(shared_ccxt_manager, False)
                     )
-                    primary_min_notional = get_min_notional(shared_ccxt_manager.get_exchange(True).exchange_code)
-                    secondary_min_notional = get_min_notional(shared_ccxt_manager.get_exchange(False).exchange_code)
+                    primary_code = shared_ccxt_manager.get_exchange(True).exchange_code
+                    secondary_code = shared_ccxt_manager.get_exchange(False).exchange_code
+                    primary_min_notional = get_min_notional(primary_code)
+                    secondary_min_notional = get_min_notional(secondary_code)
                     
                     if primary_msg is not None and secondary_msg is not None:
                         try:
@@ -157,8 +159,8 @@ class Manager:
                             temp2 = (primary_amount_coin * primary_buy_price) < 10
                             if secondary_amount_usdt < 10 or primary_amount_usdt < 10 or temp1 or temp2:
                                 msg = "Warning exchange {0}/{1}".format(
-                                    shared_ccxt_manager.get_exchange(True).exchange_code,
-                                    shared_ccxt_manager.get_exchange(False).exchange_code
+                                    primary_code,
+                                    secondary_code
                                 )
 
                                 msg = msg + "\n COIN {0} / {1}".format(primary_amount_coin, secondary_amount_coin)
@@ -191,12 +193,12 @@ class Manager:
                                 if cost_group_primary > ARBITRAGE_THRESHOLD * cost_group_secondary:
                                     # primary_order = ccxt_primary.create_market_sell_order(convert_coin(coin_trade, True), quantity)
 
-                                    if shared_ccxt_manager.get_exchange(False).exchange_code in [ExchangesCode.GATE.value, ExchangesCode.BITMART.value]:
+                                    if secondary_code in [ExchangesCode.GATE.value, ExchangesCode.BITMART.value]:
                                     
                                         # ccxt_secondary['options']['createMarketBuyOrderRequiresPrice'] = False
                                         primary_order, secondary_order = execute_orders_concurrently(
                                             lambda: ccxt_primary.create_market_sell_order(convert_coin(coin_trade, True), quantity),
-                                            lambda: ccxt_secondary.create_market_buy_order(coin_trade, cost_group_primary)
+                                            lambda: ccxt_secondary.create_market_buy_order(coin_trade, cost_group_secondary)
                                         )
                                     else:
                                         primary_order, secondary_order = execute_orders_concurrently(
@@ -292,7 +294,7 @@ class Manager:
                                                                                          quantity,
                                                                                          False)
                                 if cost_group_secondary > ARBITRAGE_THRESHOLD * cost_group_primary:
-                                    if shared_ccxt_manager.get_exchange(True).exchange_code in [ExchangesCode.GATE.value, ExchangesCode.BITMART.value]:
+                                    if primary_code in [ExchangesCode.GATE.value, ExchangesCode.BITMART.value]:
                                         primary_order, secondary_order = execute_orders_concurrently(
                                             lambda: ccxt_primary.create_market_buy_order(convert_coin(coin_trade, True), cost_group_primary),
                                             lambda: ccxt_secondary.create_market_sell_order(coin_trade, quantity)
@@ -381,8 +383,8 @@ class Manager:
                         except Exception as ex:
                             print("Error manager 0: {}".format(str(ex)))
                             send_error_telegram(ex, "Inner Trading Loop", bot)
-
-                    sleep(0.5)
+                    else:
+                        sleep(0.5)
                 except Exception as ex:
                     print("Error: {}".format(str(ex)))
                     send_error_telegram(ex, "Main Trading Loop", bot)
@@ -464,20 +466,6 @@ def handle_exchange_order_transaction(bot, exchange_primary, exchange_secondary,
                     bot.send_message(CHAT_ID, msg)
         except Exception as err:
             print("Error: {0}".format(err))
-
-
-def send_bot_message_coin(bot, shared_ccxt_manager, heading_title,
-                          primary_amount_coin, secondary_amount_coin,
-                          primary_amount_usdt, secondary_amount_usdt):
-    msg = "{0} {1}/{2}".format(
-        heading_title,
-        shared_ccxt_manager.get_exchange(False).exchange_code,
-        shared_ccxt_manager.get_exchange(True).exchange_code
-    )
-
-    msg = msg + "\n COIN {0} / {1}".format(primary_amount_coin, secondary_amount_coin)
-    msg = msg + "\n USDT {0} / {1}".format(primary_amount_usdt, secondary_amount_usdt)
-    bot.send_message(CHAT_WARNING_ID, msg)
 
 def convert_coin(coin, is_primary):
     if coin == 'WATER/USDT' and is_primary is True:
