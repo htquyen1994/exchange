@@ -233,7 +233,10 @@ class Manager:
                                         )
                                     checked = quantity * secondary_sell_price;
                                     if  checked <= min_notional:
-                                        bot.send_message(CHAT_ID, "Volumn small, SKIP")
+                                        if (datetime.datetime.now() - current_time).total_seconds() >= 600:
+                                            bot.send_message(CHAT_ID, "Volumn small, SKIP")
+                                            current_time = datetime.datetime.now()
+                                        sleep(0.1)
                                         continue
                                     precision_invalid = (quantity * primary_buy_price) <= min_notional or (
                                             quantity * secondary_sell_price) <= min_notional
@@ -331,7 +334,10 @@ class Manager:
                                         )
                                     checked = quantity * primary_sell_price;
                                     if  checked <= min_notional:
-                                        bot.send_message(CHAT_ID, "Volumn small, SKIP")
+                                        if (datetime.datetime.now() - current_time).total_seconds() >= 600:
+                                            bot.send_message(CHAT_ID, "Volumn small, SKIP")
+                                            current_time = datetime.datetime.now()
+                                        sleep(0.1)
                                         continue
 
                                     precision_invalid = (quantity * secondary_buy_price) <= min_notional or (
