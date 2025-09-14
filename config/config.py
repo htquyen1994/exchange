@@ -60,3 +60,15 @@ class TelegramSetting:
     CHAT_WARNING_ID = os.getenv("CHAT_WARNING_ID")
     CHAT_ERROR_ID = os.getenv("CHAT_ERROR_ID")
 
+
+class TradeEnv:
+    PRIMARY_COIN_ADDRESS = os.getenv("PRIMARY_COIN_ADDRESS")
+    PRIMARY_USDT_ADDRESS = os.getenv("PRIMARY_USDT_ADDRESS")
+    SECONDARY_COIN_ADDRESS = os.getenv("SECONDARY_COIN_ADDRESS")
+    SECONDARY_USDT_ADDRESS = os.getenv("SECONDARY_USDT_ADDRESS")
+    COIN_NETWORK = os.getenv("COIN_NETWORK")
+    USDT_NETWORK = os.getenv("USDT_NETWORK")
+
+    # Tỷ lệ coin
+    PRIMARY_COIN_RATIO = float(os.getenv("PRIMARY_COIN_RATIO", 0.5))
+    SECONDARY_COIN_RATIO = 1 - PRIMARY_COIN_RATIO

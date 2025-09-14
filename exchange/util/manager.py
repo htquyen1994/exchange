@@ -14,6 +14,7 @@ from time import gmtime, strftime
 from exchange.util.log_agent import LoggerAgent
 import traceback
 from exchange.util.order_executor import execute_orders_concurrently
+from exchange.util.rebalancing import rebalancing
 
 class Manager:
     start_flag = True
@@ -77,6 +78,7 @@ class Manager:
     def do_work(self, queue_config):
         bot = telebot.TeleBot(TelegramSetting.TOKEN)
         current_time = datetime.datetime.now()
+        check_withdraw_time = datetime.datetime.now()
 
         while True:
             __pending_queue = None
@@ -153,7 +155,8 @@ class Manager:
                                 msg = msg + "\n USDT {0} / {1}".format(primary_amount_usdt, secondary_amount_usdt)
 
                                 bot.send_message(TelegramSetting.CHAT_WARNING_ID, msg)
-                                sleep(20)
+                                rebalancing(primary_msg, secondary_msg, coin_trade)
+                                sleep(300)
                                 continue
                             # ban san primary (gate) bids, mua secondary (bingx): ask
                             if primary_buy_price > TradeSetting.ARBITRAGE_THRESHOLD * secondary_sell_price:
@@ -259,7 +262,7 @@ class Manager:
                                         msg_transaction = {'primary': primary_pending_order,
                                                            'secondary': secondary_pending_order}
                                         __pending_queue.put(msg_transaction)
-
+                                check_withdraw_time = datetime.datetime.now()
                             # Bán sàn bingx, mua gate
                             elif secondary_buy_price > TradeSetting.ARBITRAGE_THRESHOLD * primary_sell_price:
                                 is_command_group = False
@@ -365,13 +368,16 @@ class Manager:
                                                            'secondary': secondary_pending_order}
                                         __pending_queue.put(msg_transaction)
                                         # __pending_queue.put(secondary_pending_order)
-
+                                check_withdraw_time = datetime.datetime.now()
                             else:
                                 sleep(0.1)
                                 print("Waiting...")
                                 if (datetime.datetime.now() - current_time).total_seconds() >= 600:
                                     bot.send_message(TelegramSetting.CHAT_ID, "Trading status is waiting - not match")
                                     current_time = datetime.datetime.now()
+                                if (datetime.datetime.now() - check_withdraw_time).total_seconds() >=1800:
+                                    rebalancing(primary_msg, secondary_msg, coin_trade)
+
                         except Exception as ex:
                             print("Error manager 0: {}".format(str(ex)))
                             send_error_telegram(ex, "Inner Trading Loop", bot)
