@@ -307,10 +307,10 @@ class Manager:
                                     precision_invalid = (quantity * secondary_buy_price) <= secondary_min_notional or (
                                             quantity * primary_sell_price) <= primary_min_notional
                                     if precision_invalid:
-                                        bot.send_message(TelegramSetting.CHAT_ID, "Volumn small, SKIP")
-                                        current_time = datetime.datetime.now()
+                                        if (datetime.datetime.now() - current_time).total_seconds() >= 600:
+                                            bot.send_message(TelegramSetting.CHAT_ID, "Volumn small, SKIP")
+                                            current_time = datetime.datetime.now()
                                         sleep(0.1)
-                                        continue
                                     else:
                                         primary_order, secondary_order = execute_orders_concurrently(
                                             lambda: ccxt_primary.create_limit_buy_order(convert_coin(coin_trade, True), quantity, primary_sell_price),
