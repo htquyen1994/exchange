@@ -78,8 +78,8 @@ class ExchangePendingThread:
                             #         secondary_order_status = secondary_ccxt_manager.fetch_closed_order(
                             #             primary_transaction.order_id, symbol)
 
-                            filled_primary = get_filled_size(primary_order_status)
-                            filled_secondary = get_filled_size(secondary_order_status)
+                            filled_primary = get_filled_size(primary_exchange_code, primary_order_status)
+                            filled_secondary = get_filled_size(secondary_exchange_code, secondary_order_status)
                             price_primary = primary_order_status['price']
                             price_secondary = secondary_order_status['price']
                             side_primary = primary_order_status['side']

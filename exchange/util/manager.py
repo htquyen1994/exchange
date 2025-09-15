@@ -99,7 +99,9 @@ class Manager:
                     )
                     primary_code = shared_ccxt_manager.get_exchange(True).exchange_code
                     secondary_code = shared_ccxt_manager.get_exchange(False).exchange_code
-                    min_notional = get_min_notional([primary_code, secondary_code])
+                    
+                    primary_min_notional = get_min_notional(primary_code)
+                    secondary_min_notional = get_min_notional(secondary_code)
                     
                     if primary_msg is not None and secondary_msg is not None:
                         try:
@@ -205,38 +207,20 @@ class Manager:
                                     __pending_queue.put(msg_transaction)
                                     is_command_group = True
                                 if not is_command_group:
-                                    # quantity = max(min(
-                                    #     min(
-                                    #         primary_buy_price * primary_buy_quantity,
-                                    #         secondary_sell_price * secondary_sell_quantity,
-                                    #         primary_amount_usdt,
-                                    #         secondary_amount_usdt) / primary_buy_price, primary_amount_coin,
-                                    #     secondary_amount_coin), (3.1 / secondary_sell_price))
                                     quantity = min(
                                             primary_buy_quantity,
                                             secondary_sell_quantity,
                                             primary_amount_coin,
                                             secondary_amount_usdt / secondary_sell_price
                                         )
-                                    checked = quantity * secondary_sell_price;
-                                    if  checked <= min_notional:
+                                    precision_invalid = (quantity * primary_buy_price) <= primary_min_notional or (
+                                            quantity * secondary_sell_price) <= secondary_min_notional
+                                    if precision_invalid:
                                         if (datetime.datetime.now() - current_time).total_seconds() >= 600:
                                             bot.send_message(TelegramSetting.CHAT_ID, "Volumn small, SKIP")
                                             current_time = datetime.datetime.now()
                                         sleep(0.1)
                                         continue
-                                    precision_invalid = (quantity * primary_buy_price) <= min_notional or (
-                                            quantity * secondary_sell_price) <= min_notional
-                                    if precision_invalid:
-                                        msg = "======PRECISION PRICE======\n"
-                                        msg = msg + "USDT {0}/{1}\n".format(primary_amount_usdt, secondary_amount_usdt)
-                                        msg = msg + "COIN {0}/{1}\n".format(primary_amount_coin, secondary_amount_coin)
-                                        msg = msg + "quantity: {0}\n".format(quantity)
-                                        msg = msg + "Price buy: {0} => {1}\n".format(primary_buy_price,
-                                                                                     quantity * primary_buy_price)
-                                        msg = msg + "Second sell: {0} => {1}\n".format(secondary_sell_price,
-                                                                                       quantity * primary_buy_price)
-                                        bot.send_message(TelegramSetting.CHAT_WARNING_ID, msg)
                                     else:
                                         primary_order, secondary_order = execute_orders_concurrently(
                                             lambda: ccxt_primary.create_limit_sell_order(convert_coin(coin_trade, True), quantity, primary_buy_price),
@@ -319,30 +303,14 @@ class Manager:
                                             secondary_amount_coin,
                                             primary_amount_usdt / primary_sell_price
                                         )
-                                    checked = quantity * primary_sell_price;
-                                    if  checked <= min_notional:
-                                        if (datetime.datetime.now() - current_time).total_seconds() >= 600:
-                                            bot.send_message(TelegramSetting.CHAT_ID, "Volumn small, SKIP")
-                                            current_time = datetime.datetime.now()
+
+                                    precision_invalid = (quantity * secondary_buy_price) <= secondary_min_notional or (
+                                            quantity * primary_sell_price) <= primary_min_notional
+                                    if precision_invalid:
+                                        bot.send_message(TelegramSetting.CHAT_ID, "Volumn small, SKIP")
+                                        current_time = datetime.datetime.now()
                                         sleep(0.1)
                                         continue
-
-                                    precision_invalid = (quantity * secondary_buy_price) <= min_notional or (
-                                            quantity * primary_sell_price) <= min_notional
-                                    if precision_invalid:
-                                        msg = "======PRECISION PRICE======\n"
-                                        msg = msg + "quantity: {0}\n".format(quantity)
-                                        msg = msg + "USDT {0}/{1} => {2}\n".format(primary_amount_usdt,
-                                                                                   secondary_amount_usdt, (
-                                                                                           primary_amount_usdt + secondary_amount_usdt))
-                                        msg = msg + "COIN {0}/{1} => {2}\n".format(primary_amount_coin,
-                                                                                   secondary_amount_coin, (
-                                                                                           primary_amount_coin + secondary_amount_coin))
-                                        msg = msg + "Price sell: {0} => {1}\n".format(primary_sell_price,
-                                                                                      quantity * primary_sell_price)
-                                        msg = msg + "Second buy: {0} => {1}\n".format(secondary_buy_price,
-                                                                                      quantity * secondary_buy_price)
-                                        bot.send_message(TelegramSetting.CHAT_WARNING_ID, msg)
                                     else:
                                         primary_order, secondary_order = execute_orders_concurrently(
                                             lambda: ccxt_primary.create_limit_buy_order(convert_coin(coin_trade, True), quantity, primary_sell_price),
@@ -559,9 +527,5 @@ Traceback:
     except Exception as telegram_ex:
         print("Failed to send telegram: {}".format(str(telegram_ex)))
 
-def get_min_notional(exchange_codes: list[str]) -> float:
-    values = [
-        ExchangeNotionalSetting.MIN.get(code.upper(), ExchangeNotionalSetting.MIN["DEFAULT"])
-        for code in exchange_codes
-    ]
-    return max(values) if values else ExchangeNotionalSetting.MIN["DEFAULT"]
+def get_min_notional(exchange_code: str) -> float:
+    return ExchangeNotionalSetting.MIN.get(exchange_code.upper(), ExchangeNotionalSetting.MIN["DEFAULT"])
