@@ -2,18 +2,16 @@ import datetime
 import multiprocessing
 from multiprocessing import Process, Event, Queue
 from time import sleep
-
-from config.config import ExchangesCode, TradeSetting, TelegramSetting, ExchangeNotionalSetting
+from config.config import TradeSetting, TelegramSetting, ExchangeNotionalSetting
 from exchange.models.order_status import OrderStatus
 from exchange.util.ccxt_manager import CcxtManager
 from exchange.util.exchange_pending_thread import ExchangePendingThread
 from exchange.util.exchange_thread import ExchangeThread
 import telebot
-from time import gmtime, strftime
-
+from collections import deque
 from exchange.util.log_agent import LoggerAgent
-import traceback
 from exchange.util.order_executor import execute_orders_concurrently
+from exchange.util.telegram_utils import send_error_telegram
 
 class Manager:
     start_flag = True
@@ -104,245 +102,109 @@ class Manager:
                     secondary_min_notional = get_min_notional(secondary_code)
                     
                     if primary_msg is not None and secondary_msg is not None:
-                        try:
-                            # primary exchange
-                            primary_buy_price = primary_msg['order_book']['bids'][0][0]
-                            primary_sell_price = primary_msg['order_book']['asks'][0][0]
-                            primary_buy_quantity = primary_msg['order_book']['bids'][0][1]
-                            primary_sell_quantity = primary_msg['order_book']['asks'][0][1]
-                            primary_balance = primary_msg['balance']
-                            primary_amount_usdt = primary_balance['amount_usdt']
-                            primary_amount_coin = primary_balance['amount_coin']
+                        # primary exchange
+                        primary_sell_price = primary_msg['order_book']['bids'][0][0]
+                        primary_buy_price = primary_msg['order_book']['asks'][0][0]
+                        primary_balance = primary_msg['balance']
+                        primary_amount_usdt = primary_balance['amount_usdt']
+                        primary_amount_coin = primary_balance['amount_coin']
 
-                            # secondary exchange
-                            secondary_buy_price = secondary_msg['order_book']['bids'][0][0]
-                            secondary_sell_price = secondary_msg['order_book']['asks'][0][0]
-                            secondary_buy_quantity = secondary_msg['order_book']['bids'][0][1]
-                            secondary_sell_quantity = secondary_msg['order_book']['asks'][0][1]
-                            secondary_balance = secondary_msg['balance']
-                            secondary_amount_usdt = secondary_balance['amount_usdt']
-                            secondary_amount_coin = secondary_balance['amount_coin']
+                        # secondary exchange
+                        secondary_sell_price = secondary_msg['order_book']['bids'][0][0]
+                        secondary_buy_price = secondary_msg['order_book']['asks'][0][0]
+                        secondary_balance = secondary_msg['balance']
+                        secondary_amount_usdt = secondary_balance['amount_usdt']
+                        secondary_amount_coin = secondary_balance['amount_coin']
 
-                            # # Cost group
-                            # primary_cost_group = calc_order_group(primary_msg['order_book'])
-                            # secondary_cost_group = calc_order_group(secondary_msg['order_book'])
-
-                            msg_1 = "Secondary exchange {0} / {1}".format(
-                                secondary_amount_usdt,
-                                secondary_amount_coin
+                        coin_trade = shared_ccxt_manager.get_coin_trade()
+                        ccxt_primary = shared_ccxt_manager.get_ccxt(True)
+                        ccxt_secondary = shared_ccxt_manager.get_ccxt(False)
+                        secondary_coin_condition = (secondary_amount_coin * secondary_buy_price) < 10
+                        primary_coin_condition = (primary_amount_coin * primary_buy_price) < 10
+                        if secondary_amount_usdt < 10 or primary_amount_usdt < 10 or secondary_coin_condition or primary_coin_condition:
+                            msg = "Warning exchange {0}/{1}".format(
+                                primary_code,
+                                secondary_code
                             )
 
-                            msg_2 = "Primary exchange {0} / {1}".format(
-                                primary_amount_usdt,
-                                primary_amount_coin
-                            )
+                            msg = msg + "\n COIN {0} / {1}".format(primary_amount_coin, secondary_amount_coin)
+                            msg = msg + "\n USDT {0} / {1}".format(primary_amount_usdt, secondary_amount_usdt)
 
-                            # print(msg_1)
-                            # print(msg_2)
+                            bot.send_message(TelegramSetting.CHAT_WARNING_ID, msg)
+                            sleep(300)
+                            continue
+                        # mua sàn secondary - bán sàn primary
+                        if primary_sell_price > TradeSetting.ARBITRAGE_THRESHOLD * secondary_buy_price:
+                            trade_info = maximum_quantity_trade_able(secondary_msg['order_book'],primary_msg['order_book'], TradeSetting.ARBITRAGE_THRESHOLD, TradeSetting.MAX_TRADE_QUANTITY)
+                            sell_price = trade_info["sell_price"]
+                            buy_price = trade_info["buy_price"]
+                            quantity =min(trade_info["quantity"], primary_amount_coin, secondary_amount_usdt/buy_price) 
 
-                            coin_trade = shared_ccxt_manager.get_coin_trade()
-                            ccxt_primary = shared_ccxt_manager.get_ccxt(True)
-                            ccxt_secondary = shared_ccxt_manager.get_ccxt(False)
-                            temp1 = (secondary_amount_coin * secondary_buy_price) < 10
-                            temp2 = (primary_amount_coin * primary_buy_price) < 10
-                            if secondary_amount_usdt < 10 or primary_amount_usdt < 10 or temp1 or temp2:
-                                msg = "Warning exchange {0}/{1}".format(
-                                    primary_code,
-                                    secondary_code
-                                )
-
-                                msg = msg + "\n COIN {0} / {1}".format(primary_amount_coin, secondary_amount_coin)
-                                msg = msg + "\n USDT {0} / {1}".format(primary_amount_usdt, secondary_amount_usdt)
-
-                                bot.send_message(TelegramSetting.CHAT_WARNING_ID, msg)
-                                sleep(20)
-                                continue
-                            # ban san primary (gate) bids, mua secondary (bingx): ask
-                            if primary_buy_price > TradeSetting.ARBITRAGE_THRESHOLD * secondary_sell_price:
-                                is_command_group = False
-                                # Handle group order
-                                quantity_group = calc_quantity_group_order(primary_msg['order_book'],
-                                                                          secondary_msg['order_book'],
-                                                                          False)
-
-                                quantity = min(
-                                        quantity_group['quantity'],
-                                        primary_amount_coin,
-                                        secondary_amount_usdt / secondary_sell_price,
-                                        TradeSetting.MAX_TRADE_QUANTITY
-                                    )
-
-                                cost_group_primary = calc_cost_group_order_by_quantity(primary_msg['order_book'],
-                                                                                       quantity,
-                                                                                       False)
-                                cost_group_secondary = calc_cost_group_order_by_quantity(secondary_msg['order_book'],
-                                                                                         quantity,
-                                                                                         True)
-                                if cost_group_primary > TradeSetting.ARBITRAGE_THRESHOLD * cost_group_secondary:
-                                    # primary_order = ccxt_primary.create_market_sell_order(convert_coin(coin_trade, True), quantity)
-
-                                    if secondary_code in [ExchangesCode.GATE.value, ExchangesCode.BITMART.value]:
-                                    
-                                        # ccxt_secondary['options']['createMarketBuyOrderRequiresPrice'] = False
-                                        primary_order, secondary_order = execute_orders_concurrently(
-                                            lambda: ccxt_primary.create_market_sell_order(convert_coin(coin_trade, True), quantity),
-                                            lambda: ccxt_secondary.create_market_buy_order(coin_trade, cost_group_secondary)
-                                        )
-                                    else:
-                                        primary_order, secondary_order = execute_orders_concurrently(
-                                            lambda: ccxt_primary.create_market_sell_order(convert_coin(coin_trade, True), quantity),
-                                            lambda: ccxt_secondary.create_market_buy_order(coin_trade, quantity)
-                                        )
-                                    order_mgs_primary = round(cost_group_primary, 2)
-                                    order_mgs_secondary = round(cost_group_secondary, 2)
-                                    primary_pending_order = OrderStatus(True,
-                                                                        primary_order['id'],
-                                                                        order_mgs_primary)
-                                    secondary_pending_order = OrderStatus(False,
-                                                                          secondary_order['id'],
-                                                                          order_mgs_secondary)
-
-                                    msg_transaction = {'primary': primary_pending_order,
-                                                       'secondary': secondary_pending_order}
-                                    __pending_queue.put(msg_transaction)
-                                    is_command_group = True
-                                if not is_command_group:
-                                    quantity = min(
-                                            primary_buy_quantity,
-                                            secondary_sell_quantity,
-                                            primary_amount_coin,
-                                            secondary_amount_usdt / secondary_sell_price
-                                        )
-                                    precision_invalid = (quantity * primary_buy_price) <= primary_min_notional or (
-                                            quantity * secondary_sell_price) <= secondary_min_notional
-                                    if precision_invalid:
-                                        if (datetime.datetime.now() - current_time).total_seconds() >= 600:
-                                            bot.send_message(TelegramSetting.CHAT_ID, "Volumn small, SKIP")
-                                            current_time = datetime.datetime.now()
-                                        sleep(0.1)
-                                        continue
-                                    else:
-                                        primary_order, secondary_order = execute_orders_concurrently(
-                                            lambda: ccxt_primary.create_limit_sell_order(convert_coin(coin_trade, True), quantity, primary_buy_price),
-                                            lambda: ccxt_secondary.create_limit_buy_order(coin_trade, quantity, secondary_sell_price)
-                                        )
-                                        # print("Call 1 => {0} / {1}".format(primary_order['id'], secondary_order['id']))
-                                        # handle_exchange_order_transaction(bot,
-                                        #                                   ccxt_primary, ccxt_secondary,
-                                        #                                   primary_order['id'], secondary_order['id'],
-                                        #                                   coin_trade)
-                                        order_mgs_primary = round(quantity * primary_buy_price, 2)
-                                        order_mgs_secondary = round(quantity * secondary_sell_price, 2)
-                                        primary_pending_order = OrderStatus(True,
-                                                                            primary_order['id'],
-                                                                            order_mgs_primary)
-                                        secondary_pending_order = OrderStatus(False,
-                                                                              secondary_order['id'],
-                                                                              order_mgs_secondary)
-
-                                        msg_transaction = {'primary': primary_pending_order,
-                                                           'secondary': secondary_pending_order}
-                                        __pending_queue.put(msg_transaction)
-
-                            # Bán sàn bingx, mua gate
-                            elif secondary_buy_price > TradeSetting.ARBITRAGE_THRESHOLD * primary_sell_price:
-                                is_command_group = False
-                                # Handle group order
-                                quantity_group = calc_quantity_group_order(primary_msg['order_book'],
-                                                                           secondary_msg['order_book'],
-                                                                           True)
-
-                                quantity = min(
-                                        quantity_group['quantity'],
-                                        secondary_amount_coin,
-                                        primary_amount_usdt / primary_sell_price,
-                                        TradeSetting.MAX_TRADE_QUANTITY
-                                    )
-
-                                # Bán sàn bingx, mua gate cost_group_secondary
-                                cost_group_primary = calc_cost_group_order_by_quantity(primary_msg['order_book'],
-                                                                                       quantity,
-                                                                                       True)
-                                cost_group_secondary = calc_cost_group_order_by_quantity(secondary_msg['order_book'],
-                                                                                         quantity,
-                                                                                         False)
-                                if cost_group_secondary > TradeSetting.ARBITRAGE_THRESHOLD * cost_group_primary:
-                                    if primary_code in [ExchangesCode.GATE.value, ExchangesCode.BITMART.value]:
-                                        primary_order, secondary_order = execute_orders_concurrently(
-                                            lambda: ccxt_primary.create_market_buy_order(convert_coin(coin_trade, True), cost_group_primary),
-                                            lambda: ccxt_secondary.create_market_sell_order(coin_trade, quantity)
-                                        )
-
-                                    else:
-                                        primary_order, secondary_order = execute_orders_concurrently(
-                                            lambda: ccxt_primary.create_market_buy_order(convert_coin(coin_trade, True), quantity),
-                                            lambda: ccxt_secondary.create_market_sell_order(coin_trade, quantity)
-                                        )
-                                    order_mgs_primary = round(cost_group_primary, 2)
-                                    order_mgs_secondary = round(cost_group_secondary, 2)
-                                    print("2====> buy primary, sell secondary {0} => {1}".format(cost_group_primary,
-                                                                                                 cost_group_secondary))
-                                    print("2====> buy primary, sell secondary Mua ban quantity {0} => {1}".format(quantity, round(
-                                        cost_group_primary - cost_group_secondary, 2)))
-
-                                    primary_pending_order = OrderStatus(True,
-                                                                        primary_order['id'],
-                                                                        order_mgs_primary)
-                                    secondary_pending_order = OrderStatus(False,
-                                                                          secondary_order['id'],
-                                                                          order_mgs_secondary)
-
-                                    msg_transaction = {'primary': primary_pending_order,
-                                                       'secondary': secondary_pending_order}
-                                    __pending_queue.put(msg_transaction)
-                                    is_command_group = True
-                                if not is_command_group:
-                                    quantity = min(
-                                            primary_buy_quantity,
-                                            secondary_sell_quantity,
-                                            secondary_amount_coin,
-                                            primary_amount_usdt / primary_sell_price
-                                        )
-
-                                    precision_invalid = (quantity * secondary_buy_price) <= secondary_min_notional or (
-                                            quantity * primary_sell_price) <= primary_min_notional
-                                    if precision_invalid:
-                                        if (datetime.datetime.now() - current_time).total_seconds() >= 600:
-                                            bot.send_message(TelegramSetting.CHAT_ID, "Volumn small, SKIP")
-                                            current_time = datetime.datetime.now()
-                                        sleep(0.1)
-                                    else:
-                                        primary_order, secondary_order = execute_orders_concurrently(
-                                            lambda: ccxt_primary.create_limit_buy_order(convert_coin(coin_trade, True), quantity, primary_sell_price),
-                                            lambda: ccxt_secondary.create_limit_sell_order(coin_trade, quantity, secondary_buy_price)
-                                        )
-                                        # handle_exchange_order_transaction(bot,
-                                        #                                   ccxt_primary, ccxt_secondary,
-                                        #                                   primary_order['id'], secondary_order['id'],
-                                        #                                   coin_trade)
-                                        order_mgs_primary = round(quantity * primary_sell_price, 2)
-                                        order_mgs_secondary = round(quantity * secondary_buy_price, 2)
-                                        primary_pending_order = OrderStatus(True,
-                                                                            primary_order['id'],
-                                                                            order_mgs_primary)
-                                        secondary_pending_order = OrderStatus(False,
-                                                                              secondary_order['id'],
-                                                                              order_mgs_secondary)
-
-                                        msg_transaction = {'primary': primary_pending_order,
-                                                           'secondary': secondary_pending_order}
-                                        __pending_queue.put(msg_transaction)
-                                        # __pending_queue.put(secondary_pending_order)
-
-                            else:
-                                sleep(0.1)
-                                print("Waiting...")
+                            precision_invalid = (quantity * buy_price) <= secondary_min_notional or (
+                                    quantity * sell_price) <= primary_min_notional
+                            if precision_invalid:
                                 if (datetime.datetime.now() - current_time).total_seconds() >= 600:
-                                    bot.send_message(TelegramSetting.CHAT_ID, "Trading status is waiting - not match")
+                                    bot.send_message(TelegramSetting.CHAT_ID, "Volume small, SKIP")
                                     current_time = datetime.datetime.now()
-                        except Exception as ex:
-                            print("Error manager 0: {}".format(str(ex)))
-                            send_error_telegram(ex, "Inner Trading Loop", bot)
+                                sleep(0.1)
+                                continue
+                            else:
+                                primary_order, secondary_order = execute_orders_concurrently(
+                                    lambda: ccxt_primary.create_limit_sell_order(coin_trade, quantity, sell_price),
+                                    lambda: ccxt_secondary.create_limit_buy_order(coin_trade, quantity, buy_price)
+                                )
+                                order_mgs_primary = round(quantity * buy_price, 2)
+                                order_mgs_secondary = round(quantity * sell_price, 2)
+                                primary_pending_order = OrderStatus(True,
+                                                                    primary_order['id'],
+                                                                    order_mgs_primary)
+                                secondary_pending_order = OrderStatus(False,
+                                                                      secondary_order['id'],
+                                                                      order_mgs_secondary)
+
+                                msg_transaction = {'primary': primary_pending_order,
+                                                    'secondary': secondary_pending_order}
+                                __pending_queue.put(msg_transaction)
+
+                        # mua sàn primary - bán sàn secondary
+                        elif secondary_sell_price > TradeSetting.ARBITRAGE_THRESHOLD * primary_buy_price:
+                            trade_info = maximum_quantity_trade_able(primary_msg['order_book'], secondary_msg['order_book'], TradeSetting.ARBITRAGE_THRESHOLD, TradeSetting.MAX_TRADE_QUANTITY)
+                            sell_price = trade_info["sell_price"]
+                            buy_price = trade_info["buy_price"]
+                            quantity =min(trade_info["quantity"], secondary_amount_coin, primary_amount_usdt/buy_price) 
+
+                            precision_invalid = (quantity * sell_price) <= secondary_min_notional or (
+                                    quantity * buy_price) <= primary_min_notional
+                            if precision_invalid:
+                                if (datetime.datetime.now() - current_time).total_seconds() >= 600:
+                                    bot.send_message(TelegramSetting.CHAT_ID, "Volume small, SKIP")
+                                    current_time = datetime.datetime.now()
+                                sleep(0.1)
+                                continue
+                            else:
+                                primary_order, secondary_order = execute_orders_concurrently(
+                                    lambda: ccxt_primary.create_limit_buy_order(coin_trade, quantity, buy_price),
+                                    lambda: ccxt_secondary.create_limit_sell_order(coin_trade, quantity, sell_price)
+                                )
+                                order_mgs_primary = round(quantity * buy_price, 2)
+                                order_mgs_secondary = round(quantity * sell_price, 2)
+                                primary_pending_order = OrderStatus(True,
+                                                                    primary_order['id'],
+                                                                    order_mgs_primary)
+                                secondary_pending_order = OrderStatus(False,
+                                                                      secondary_order['id'],
+                                                                      order_mgs_secondary)
+
+                                msg_transaction = {'primary': primary_pending_order,
+                                                    'secondary': secondary_pending_order}
+                                __pending_queue.put(msg_transaction)
+
+                        else:
+                            sleep(0.1)
+                            print("Waiting...")
+                            if (datetime.datetime.now() - current_time).total_seconds() >= 600:
+                                bot.send_message(TelegramSetting.CHAT_ID, "Trading status is waiting - not match")
+                                current_time = datetime.datetime.now()
                     else:
                         sleep(0.5)
                 except Exception as ex:
@@ -358,34 +220,20 @@ class Manager:
                         bot.send_message(TelegramSetting.CHAT_ID, "Trading is not start")
                         current_time = datetime.datetime.now()
                 except Exception as ex:
-                    # logger.info("Send chat box error".format(ex))
                     print("Send chat box error {0}".format(ex))
             sleep(1)
             print("Process is stopped")
-            # logger.info("Process is running")
-            try:
-                if (datetime.datetime.now() - current_time).total_seconds() >= 300:
-                    bot.send_message(TelegramSetting.CHAT_ID, "Process is stopped")
-                    current_time = datetime.datetime.now()
-            except Exception as ex:
-                print("Send chat box error {0}".format(ex))
-
-
-def get_latest_queue(q):
-    if not q.empty():
-        return q.get()
-    else:
-        return None
-
+            if (datetime.datetime.now() - current_time).total_seconds() >= 300:
+                bot.send_message(TelegramSetting.CHAT_ID, "Process is stopped")
+                current_time = datetime.datetime.now()
 
 def get_balance(shared_ccxt_manager, is_primary):
     param_object = {}
     ccxt = shared_ccxt_manager.get_ccxt(is_primary)
     coin = shared_ccxt_manager.get_coin_trade()
-    coin = convert_coin(coin, is_primary)
+    balance = ccxt.fetch_balance()
     orderbook = ccxt.fetch_order_book(coin)
     param_object['order_book'] = orderbook
-    balance = ccxt.fetch_balance()
     if balance is not None and balance['free'] is not None:
         param_object['balance'] = {}
         param_object['balance']['amount_usdt'] = float(0)
@@ -398,134 +246,64 @@ def get_balance(shared_ccxt_manager, is_primary):
         return param_object
     return None
 
-
-def handle_exchange_order_transaction(bot, exchange_primary, exchange_secondary,
-                                      primary_order_id, secondary_order_id,
-                                      symbol):
-    count = 0
-    while count < 1:
-        count = count + 1
-        sleep(1)
-        try:
-            primary_order_status = exchange_primary.fetch_order(primary_order_id, symbol)
-            secondary_order_status = exchange_secondary.fetch_order(secondary_order_id, symbol)
-            # print("Order status {0} / {1} ".format(primary_order_status['status'], secondary_order_status['status']))
-            if primary_order_status['status'] == 'closed' and secondary_order_status['status'] == 'closed':
-                bot.send_message(TelegramSetting.CHAT_ID, "Buy sell success")
-                # count = count + 1
-                # continue
-            else:
-                if primary_order_status['status'] == 'open' or primary_order_status is None:
-                    result = exchange_primary.cancel_order(primary_order_id, symbol)
-                    msg = "Command cancel buy/sell at primary"
-                    bot.send_message(TelegramSetting.CHAT_ID, msg)
-
-                if secondary_order_status['status'] == 'open' or secondary_order_status is None:
-                    result = exchange_secondary.cancel_order(secondary_order_id, symbol)
-                    msg = "Command cancel buy/sell at secondary"
-                    bot.send_message(TelegramSetting.CHAT_ID, msg)
-        except Exception as err:
-            print("Error: {0}".format(err))
-
-def convert_coin(coin, is_primary):
-    if coin == 'WATER/USDT' and is_primary is True:
-        return 'WATERSOL/USDT'
-    return coin
-
-def calc_order_group(order_book):
-    loop = min(min(len(order_book['bids']), len(order_book['asks'])), 4)
-    index = 0
-    cost_buy = 0
-    cost_sell = 0
-    while index < loop:
-        cost_buy = cost_buy + order_book['bids'][index][0] * order_book['bids'][index][1]
-        cost_sell = cost_sell + order_book['asks'][index][0] * order_book['asks'][index][1]
-        index = index + 1
-    return {'cost_sell': cost_sell, 'cost_buy': cost_buy}
-
-
-def calc_quantity_group_order(order_primary, order_secondary, is_buy_primary):
-    quantity_primary = 0
-    quantity_secondary = 0
-    if is_buy_primary:
-        quantity_primary = (
-                order_primary['asks'][0][1] + order_primary['asks'][1][1] + order_primary['asks'][2][1] +
-                order_primary['asks'][3][1] + order_primary['asks'][4][1]
-        )
-        quantity_secondary = (
-                order_secondary['bids'][0][1] + order_secondary['bids'][1][1] + order_secondary['bids'][2][1] +
-                order_secondary['bids'][3][1] + order_secondary['bids'][4][1]
-        )
-    else:
-        quantity_primary = (
-                order_primary['bids'][0][1] + order_primary['bids'][1][1] + order_primary['bids'][2][1] +
-                order_primary['bids'][3][1] + order_primary['bids'][4][1])
-        quantity_secondary = (
-                order_secondary['asks'][0][1] + order_secondary['asks'][1][1] + order_secondary['asks'][2][1] +
-                order_secondary['asks'][3][1] + order_secondary['asks'][4][1])
-
-    quantity = min(quantity_secondary, quantity_primary)
-    return {'quantity': quantity, 'secondary': quantity_secondary, 'primary': quantity_primary}
-
-
-def calc_cost_group_order(order, is_buy):
-    if is_buy:
-        return (order['asks'][0][0] * order['asks'][0][1] +
-                order['asks'][1][0] * order['asks'][1][1] +
-                order['asks'][2][0] * order['asks'][2][1] +
-                order['asks'][3][0] * order['asks'][3][1] +
-                order['asks'][4][0] * order['asks'][4][1])
-    else:
-        return (order['bids'][0][0] * order['bids'][0][1] +
-                order['bids'][1][0] * order['bids'][1][1] +
-                order['bids'][2][0] * order['bids'][2][1] +
-                order['bids'][3][0] * order['bids'][3][1] +
-                order['bids'][4][0] * order['bids'][4][1])
-
-#
-def calc_cost_group_order_by_quantity(order, quantity, is_buy):
-    if is_buy:
-        ok_q1 = min(order['asks'][0][1], quantity)
-        ok_q2 = min(order['asks'][1][1], quantity - ok_q1)
-        ok_q3 = min(order['asks'][2][1], quantity - ok_q2 - ok_q1)
-        ok_q4 = min(order['asks'][3][1], quantity - ok_q3 - ok_q2 - ok_q1)
-        ok_q5 = min(order['asks'][4][1], quantity - ok_q4 - ok_q3 - ok_q2 - ok_q1)
-        return (order['asks'][0][0] * ok_q1 +
-                order['asks'][1][0] * ok_q2 +
-                order['asks'][2][0] * ok_q3 +
-                order['asks'][3][0] * ok_q4 +
-                order['asks'][4][0] * ok_q5)
-    else:
-        ok_q1 = min(order['bids'][0][1], quantity)
-        ok_q2 = min(order['bids'][1][1], quantity - ok_q1)
-        ok_q3 = min(order['bids'][2][1], quantity - ok_q2 - ok_q1)
-        ok_q4 = min(order['bids'][3][1], quantity - ok_q3 - ok_q2 - ok_q1)
-        ok_q5 = min(order['bids'][4][1], quantity - ok_q4 - ok_q3 - ok_q2 - ok_q1)
-        return (order['bids'][0][0] * ok_q1 +
-                order['bids'][1][0] * ok_q2 +
-                order['bids'][2][0] * ok_q3 +
-                order['bids'][3][0] * ok_q4 +
-                order['bids'][4][0] * ok_q5)
-
-def send_error_telegram(ex, context="", bot=None):
-    if bot is None:
-        return
-    try:
-        tb = traceback.format_exc()  # lấy stack trace
-        telegram_msg = f"""🚨 ERROR ALERT 🚨
-
-Context: {context}
-Error Type: {type(ex).__name__}
-Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-Error Message:
-{str(ex)}
-
-Traceback:
-{tb}"""
-        bot.send_message(TelegramSetting.CHAT_ERROR_ID, telegram_msg)
-    except Exception as telegram_ex:
-        print("Failed to send telegram: {}".format(str(telegram_ex)))
-
 def get_min_notional(exchange_code: str) -> float:
     return ExchangeNotionalSetting.MIN.get(exchange_code.upper(), ExchangeNotionalSetting.MIN["DEFAULT"])
+
+def maximum_quantity_trade_able(buy_order_book, sell_order_book, threshold, max_trade_quantity):
+    """
+    Find the maximum tradable quantity between two order books
+    while satisfying the arbitrage threshold condition.
+
+    Args:
+        buy_order_book: {"asks": deque([(price, quantity), ...])}
+        sell_order_book: {"bids": deque([(price, quantity), ...])}
+        threshold: arbitrage threshold (multiplier)
+        max_trade_quantity: maximum trade quantity
+
+    Returns:
+        {"buy_price": float, "sell_price": float, "quantity": float}
+    """
+    asks = deque([list(x) for x in buy_order_book["asks"]])  # [price, qty]
+    bids = deque([list(x) for x in sell_order_book["bids"]])
+
+    result = {
+        "buy_price": 0,
+        "sell_price": 0,
+        "quantity": 0
+    }
+
+    while asks and bids and result["quantity"] < max_trade_quantity:
+        buy_price, buy_quantity = asks[0]
+        sell_price, sell_quantity = bids[0]
+
+        if sell_price <= buy_price * threshold:
+            break
+
+        result["buy_price"] = buy_price
+        result["sell_price"] = sell_price
+
+        remain = max_trade_quantity - result["quantity"]
+
+        if buy_quantity > sell_quantity:
+            trade_qty = min(sell_quantity, remain)
+            asks[0][1] = buy_quantity - trade_qty
+            if trade_qty == sell_quantity:
+                bids.popleft()
+            result["quantity"] += trade_qty
+        elif buy_quantity < sell_quantity:
+            trade_qty = min(buy_quantity, remain)
+            bids[0][1] = sell_quantity - trade_qty
+            if trade_qty == buy_quantity:
+                asks.popleft()
+            result["quantity"] += trade_qty
+        else:
+            trade_qty = min(buy_quantity, remain)
+            if trade_qty == buy_quantity:
+                asks.popleft()
+                bids.popleft()
+            else:
+                asks[0][1] = buy_quantity - trade_qty
+                bids[0][1] = sell_quantity - trade_qty
+            result["quantity"] += trade_qty
+
+    return result
