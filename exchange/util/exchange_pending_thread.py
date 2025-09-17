@@ -87,8 +87,7 @@ class ExchangePendingThread:
                             f"Total Profit: {total_profit:.4f}\n"
                         )
                         bot_tele.send_message(TelegramSetting.CHAT_ID, msg)
-                    else:
-                        if is_order_pending(primary_order_status) and is_order_pending(secondary_order_status):
+                    elif is_order_pending(primary_order_status) and is_order_pending(secondary_order_status):
                             execute_orders_concurrently(
                                 lambda: primary_ccxt_manager.cancel_order(primary_transaction.order_id, symbol),
                                 lambda: secondary_ccxt_manager.cancel_order(secondary_transaction.order_id, symbol)
@@ -102,26 +101,28 @@ class ExchangePendingThread:
                                 f"Total: {secondary_transaction.total}\n"
                                 f"Total Profit: {total_profit}\n"
                             )
+                            bot_tele.send_message(TelegramSetting.CHAT_ID, msg)
 
-                        else:
-                            profit = abs(round(amount * price_primary - amount * price_secondary, 4))
-                            msg = (
-                                f"⏳ Pending Orders\n"
-                                f"{primary_exchange_code.upper()} | Status: {primary_order_status['status']}\n"
-                                f"{secondary_exchange_code.upper()} | Status: {secondary_order_status['status']}\n"
-                                f"Amount: {amount}\n"
-                                f"Profit: {profit}\n"
-                                f"Total Profit: {total_profit}\n"
-                            )
-                            q.put(order_transaction)
-
-                        bot_tele.send_message(TelegramSetting.CHAT_ID, msg)
+                    elif is_order_pending(primary_order_status) ^  is_order_pending(secondary_order_status):
+                        profit = abs(round(amount * price_primary - amount * price_secondary, 4))
+                        msg = (
+                            f"⏳ Pending Orders\n"
+                            f"{primary_exchange_code.upper()} | Status: {primary_order_status['status']}\n"
+                            f"{secondary_exchange_code.upper()} | Status: {secondary_order_status['status']}\n"
+                            f"Amount: {amount}\n"
+                            f"Profit: {profit}\n"
+                            f"Total Profit: {total_profit}\n"
+                        )
+                        if not order_transaction.get('pending_sent', False):
+                            bot_tele.send_message(TelegramSetting.CHAT_ID, msg)
+                            order_transaction['pending_sent'] = True
+                        q.put(order_transaction)
                 else:
                     sleep(2)
                     # print("Thread cancel order is checking")
             except Exception as ex:
                 sleep(1)
-                print("ExchangePendingThread.job_function::".format(ex.__str__()))
+                print("ExchangePendingThread.job_function::{}".format(ex.__str__()))
                 send_error_telegram(ex, "Main Trading Loop", bot_tele)
 
 def get_total_cost(exchange_code, order):
