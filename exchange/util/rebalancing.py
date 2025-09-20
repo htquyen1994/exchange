@@ -2,7 +2,6 @@ import ccxt
 import telebot
 from config.config import TelegramSetting, TradeEnv
 
-
 _fee_cache = {}
 total_fees = 0
 
@@ -18,7 +17,7 @@ SECONDARY_COIN_RATIO = TradeEnv.SECONDARY_COIN_RATIO
 MAX_COIN_WITHDRAW = TradeEnv.MAX_COIN_WITHDRAW
 
 
-def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str):
+def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str, auto_rebalance: bool):
     """
     Rebalance USDT and coin between two exchanges
 
@@ -27,7 +26,9 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str):
         secondary: Secondary exchange instance
         symbol: Trading pair symbol (e.g., "BTC/USDT")
     """
-
+    if not auto_rebalance:
+        print("Auto rebalance if OFF")
+        return
     if (
         not PRIMARY_COIN_ADDRESS
         or not SECONDARY_COIN_ADDRESS

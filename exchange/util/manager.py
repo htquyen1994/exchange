@@ -39,8 +39,16 @@ class Manager:
         manager = multiprocessing.Manager()
         self.shared_ccxt_manager = manager.Namespace()
         self.shared_ccxt_manager.instance = CcxtManager.get_instance()
+        self.shared_config = manager.Namespace()
+        self.shared_config.auto_rebalance = False
         # self.ccxt_manager = CcxtManager.get_instance()
         # self.logger = LoggerAgent.get_instance()
+    
+    def set_auto_rebalance(self, enable: bool):
+        self.shared_config.auto_rebalance = enable
+
+    def get_auto_rebalance(self) -> bool:
+        return self.shared_config.auto_rebalance
 
     def get_shared_ccxt_manager(self):
         return self.shared_ccxt_manager
@@ -134,7 +142,7 @@ class Manager:
                     if wallet_not_enough:
                         if not is_rebalancing_flag:
                             try:
-                                rebalancing(primary_ccxt, secondary_ccxt, symbol)
+                                rebalancing(primary_ccxt, secondary_ccxt, symbol, self.shared_config.auto_rebalance)
                                 is_rebalancing_flag = True
                             except Exception as ex:
                                 is_rebalancing_flag = False

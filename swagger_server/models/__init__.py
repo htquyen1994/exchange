@@ -19,3 +19,4 @@ from swagger_server.models.login_request import LoginRequest
 from swagger_server.models.login_response import LoginResponse
 from swagger_server.models.ping_response import PingResponse
 from swagger_server.models.user_info import UserInfo
+from swagger_server.models.rebalance_toggle_request import RebalanceToggleRequest
