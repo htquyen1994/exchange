@@ -13,6 +13,7 @@ from exchange.util.log_agent import LoggerAgent
 from exchange.util.order_executor import execute_orders_concurrently
 from exchange.util.telegram_utils import send_error_telegram
 from exchange.util.ws_orderbook_watcher import WSOrderbookWatcher
+from exchange.util.rebalancing import rebalancing
 
 class Manager:
     start_flag = True
@@ -78,6 +79,7 @@ class Manager:
         current_time = datetime.datetime.now()
         refresh_balance = True
         watcher = None
+        is_rebalancing_flag = False
 
         while True:
             __pending_queue = None
@@ -128,7 +130,17 @@ class Manager:
                     
                     secondary_coin_condition = (secondary_amount_coin * secondary_buy_price) < 10
                     primary_coin_condition = (primary_amount_coin * primary_buy_price) < 10
-                    if secondary_amount_usdt < 10 or primary_amount_usdt < 10 or secondary_coin_condition or primary_coin_condition:
+                    wallet_not_enough = secondary_amount_usdt < 10 or primary_amount_usdt < 10 or secondary_coin_condition or primary_coin_condition
+                    if wallet_not_enough:
+                        if not is_rebalancing_flag:
+                            try:
+                                rebalancing(primary_ccxt, secondary_ccxt, symbol)
+                                is_rebalancing_flag = True
+                            except Exception as ex:
+                                is_rebalancing_flag = False
+                                send_error_telegram(ex, "Rebalancing Failed", bot)
+                                sleep(10)
+                        refresh_balance = True
                         msg = "Warning exchange {0}/{1}".format(
                             primary_code,
                             secondary_code
@@ -138,6 +150,8 @@ class Manager:
                         if (datetime.datetime.now() - current_time).total_seconds() >= 600:
                             bot.send_message(TelegramSetting.CHAT_WARNING_ID, msg)
                             current_time = datetime.datetime.now()
+                    else:
+                        is_rebalancing_flag = False
 
                     # mua sàn secondary - bán sàn primary
                     if primary_sell_price > TradeSetting.ARBITRAGE_THRESHOLD * secondary_buy_price:
@@ -172,6 +186,7 @@ class Manager:
                                                 'secondary': secondary_pending_order}
                             __pending_queue.put(msg_transaction)
                             refresh_balance = True
+                        
 
                     # mua sàn primary - bán sàn secondary
                     elif secondary_sell_price > TradeSetting.ARBITRAGE_THRESHOLD * primary_buy_price:
@@ -208,8 +223,8 @@ class Manager:
                             refresh_balance = True
 
                     else:
-                        print("Waiting...")
                         if (datetime.datetime.now() - current_time).total_seconds() >= 600:
+                            print("Waiting...")
                             refresh_balance = True
                             bot.send_message(TelegramSetting.CHAT_ID, "Trading status is waiting - not match")
                             current_time = datetime.datetime.now()
