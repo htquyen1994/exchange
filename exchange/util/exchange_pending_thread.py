@@ -5,6 +5,7 @@ from exchange.util.order_executor import execute_orders_concurrently
 from config.config import ExchangesCode, TelegramSetting
 from exchange.util.ccxt_manager import CcxtManager
 from exchange.util.telegram_utils import send_error_telegram
+from config.profit_tracker import load_trading_data, save_trading_data
 
 initialize = False
 
@@ -37,7 +38,8 @@ class ExchangePendingThread:
             self.thread.join()
 
     def job_function(self, q, shared_ccxt_manager, bot_tele):
-        total_profit = 0
+        trading_data = load_trading_data()
+        total_profit = trading_data.get("total_profit", 0)    
         while self.is_running:
             try:
                 if not q.empty():
@@ -78,6 +80,8 @@ class ExchangePendingThread:
                     if is_order_completed(primary_order_status) and is_order_completed(secondary_order_status):
                         profit = abs(cost_secondary - cost_primary)
                         total_profit = total_profit + profit
+                        save_trading_data(total_profit=total_profit)
+
                         msg = (
                             f"✅ Trade Completed\n"
                             f"{primary_exchange_code.upper()} | Side: {side_primary} | Status: {primary_order_status['status']}\n"

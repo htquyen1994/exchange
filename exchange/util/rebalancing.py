@@ -1,9 +1,8 @@
 import ccxt
 import telebot
 from config.config import TelegramSetting, TradeEnv
-
+from config.profit_tracker import load_trading_data, save_trading_data
 _fee_cache = {}
-total_fees = 0
 
 
 PRIMARY_COIN_ADDRESS = TradeEnv.PRIMARY_COIN_ADDRESS
@@ -15,7 +14,6 @@ USDT_NETWORK = TradeEnv.USDT_NETWORK
 PRIMARY_COIN_RATIO = TradeEnv.PRIMARY_COIN_RATIO
 SECONDARY_COIN_RATIO = TradeEnv.SECONDARY_COIN_RATIO
 MAX_COIN_WITHDRAW = TradeEnv.MAX_COIN_WITHDRAW
-
 
 def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str, auto_rebalance: bool):
     """
@@ -29,6 +27,9 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str, a
     if not auto_rebalance:
         print("Auto rebalance if OFF")
         return
+
+    trading_data = load_trading_data()
+    total_fees = trading_data.get("total_fees", 0)
     if (
         not PRIMARY_COIN_ADDRESS
         or not SECONDARY_COIN_ADDRESS
@@ -40,7 +41,7 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str, a
         raise ValueError("One or more addresses/networks are not configured")
 
     bot = telebot.TeleBot(TelegramSetting.TOKEN)
-    global _fee_cache, total_fees
+    global _fee_cache
     base_coin = symbol.replace("/USDT", "")
     primary_fee = get_fee(primary, base_coin, COIN_NETWORK)
     secondary_fee = get_fee(secondary, base_coin, COIN_NETWORK)
@@ -124,6 +125,8 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str, a
                     print(message)
             else:
                 print(f"Pending Coin withdrawal detected on {primary.id}, skip withdraw")
+        
+        save_trading_data(total_fees=total_fees)
 
     except ccxt.NetworkError as e:
         error_msg = f"Network error during rebalancing: {str(e)}"

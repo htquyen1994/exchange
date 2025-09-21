@@ -85,7 +85,6 @@ class Manager:
     def do_work(self, queue_config):
         bot = telebot.TeleBot(TelegramSetting.TOKEN)
         current_time = datetime.datetime.now()
-        refresh_balance = True
         watcher = None
         is_rebalancing_flag = False
 
@@ -107,20 +106,19 @@ class Manager:
                         __pending_thread.start_job(shared_ccxt_manager, bot)
                         sleep(1)
                         initialize = True
+                    primary_balance, secondary_balance = execute_orders_concurrently(
+                        lambda: get_balance(primary_ccxt, symbol),
+                        lambda: get_balance(secondary_ccxt, symbol)
+                    )
+                    if primary_balance is None or secondary_balance is None:
+                        continue
                     if not watcher.wait_update(timeout=5):
                         continue
                     
                     primary_orderbook, secondary_orderbook = watcher.get_orderbooks()
                     if not primary_orderbook or not secondary_orderbook:
                         continue
-                    primary_balance, secondary_balance = execute_orders_concurrently(
-                        lambda: get_balance(primary_ccxt, symbol, refresh_balance),
-                        lambda: get_balance(secondary_ccxt, symbol, refresh_balance)
-                    )
-                    if primary_balance is None or secondary_balance is None:
-                        continue
                     
-                    refresh_balance = False  
                     primary_code = primary_ccxt.id
                     secondary_code = secondary_ccxt.id
                     primary_min_notional = get_min_notional(primary_code)
@@ -148,7 +146,6 @@ class Manager:
                                 is_rebalancing_flag = False
                                 send_error_telegram(ex, "Rebalancing Failed", bot)
                                 sleep(10)
-                        refresh_balance = True
                         msg = "Warning exchange {0}/{1}".format(
                             primary_code,
                             secondary_code
@@ -193,7 +190,6 @@ class Manager:
                             msg_transaction = {'primary': primary_pending_order,
                                                 'secondary': secondary_pending_order}
                             __pending_queue.put(msg_transaction)
-                            refresh_balance = True
                         
 
                     # mua sàn primary - bán sàn secondary
@@ -228,12 +224,10 @@ class Manager:
                             msg_transaction = {'primary': primary_pending_order,
                                                 'secondary': secondary_pending_order}
                             __pending_queue.put(msg_transaction)
-                            refresh_balance = True
 
                     else:
                         if (datetime.datetime.now() - current_time).total_seconds() >= 600:
                             print("Waiting...")
-                            refresh_balance = True
                             bot.send_message(TelegramSetting.CHAT_ID, "Trading status is waiting - not match")
                             current_time = datetime.datetime.now()
                     sleep(0.01)
@@ -260,22 +254,7 @@ class Manager:
                 bot.send_message(TelegramSetting.CHAT_ID, "Process is stopped")
                 current_time = datetime.datetime.now()
 
-_cached_balance = {}
-
-def get_balance(ccxt_instance, symbol, refresh_balance=True):
-    """
-    Get balance by ccxt_instance.
-    If refresh_balance=False, return cache value.
-
-    Return dict: {'amount_usdt': float, 'amount_coin': float}
-    """
-    global _cached_balance
-
-    key = ccxt_instance.id  # cache theo sàn
-
-    if not refresh_balance and key in _cached_balance:
-        return _cached_balance[key]
-
+def get_balance(ccxt_instance, symbol):
     balance = ccxt_instance.fetch_balance()
     result = {'amount_usdt': 0.0, 'amount_coin': 0.0}
 
@@ -286,9 +265,6 @@ def get_balance(ccxt_instance, symbol, refresh_balance=True):
                 result['amount_usdt'] = float(amount)
             if currency == base_coin:
                 result['amount_coin'] = float(amount)
-
-        # lưu cache
-        _cached_balance[key] = result
         return result
 
     return None
