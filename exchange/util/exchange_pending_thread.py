@@ -74,11 +74,9 @@ class ExchangePendingThread:
                     price_secondary = secondary_order_status['price']
                     side_primary = primary_order_status['side']
                     side_secondary = secondary_order_status['side']
-                    cost_primary = get_total_cost(primary_exchange_code, primary_order_status)
-                    cost_secondary = get_total_cost(secondary_exchange_code, secondary_order_status)
                     amount = min(filled_primary, filled_secondary)
                     if is_order_completed(primary_order_status) and is_order_completed(secondary_order_status):
-                        profit = abs(cost_secondary - cost_primary)
+                        profit = calculate_profit(primary_ccxt_manager, primary_transaction.order_id, secondary_ccxt_manager, secondary_transaction.order_id, symbol)
                         total_profit = total_profit + profit
                         save_trading_data(total_profit=total_profit)
 
@@ -103,7 +101,7 @@ class ExchangePendingThread:
                                 f"Total: {primary_transaction.total}\n"
                                 f"{secondary_exchange_code.upper()} |"
                                 f"Total: {secondary_transaction.total}\n"
-                                f"Total Profit: {total_profit}\n"
+                                f"Total Profit: {total_profit:.4f}\n"
                             )
                             bot_tele.send_message(TelegramSetting.CHAT_ID, msg)
 
@@ -115,7 +113,7 @@ class ExchangePendingThread:
                             f"{secondary_exchange_code.upper()} | Status: {secondary_order_status['status']}\n"
                             f"Amount: {amount}\n"
                             f"Profit: {profit}\n"
-                            f"Total Profit: {total_profit}\n"
+                            f"Total Profit: {total_profit:.4f}\n"
                         )
                         if not order_transaction.get('pending_sent', False):
                             bot_tele.send_message(TelegramSetting.CHAT_ID, msg)
@@ -129,17 +127,23 @@ class ExchangePendingThread:
                 print("ExchangePendingThread.job_function::{}".format(ex.__str__()))
                 send_error_telegram(ex, "Main Trading Loop", bot_tele)
 
-def get_total_cost(exchange_code, order):
-    if exchange_code == ExchangesCode.BINGX.value:
-        return float(order['info']['cummulativeQuoteQty'])
-    if exchange_code == ExchangesCode.GATE.value:
-        return float(order['info']['filled_total'])
-    if exchange_code == ExchangesCode.BYBIT.value:
-        return float(order['info']['cumExecValue'])
-    if exchange_code == ExchangesCode.MEXC.value:
-        return float(order['info']['cummulativeQuoteQty'])
-    if exchange_code == ExchangesCode.BITMART.value:
-        return float(order['info']['filledNotional'])
+def calculate_profit(primary, primary_order_id, secondary, secondary_order_id, symbol):
+    def get_summary(exchange, order_id):
+        trades = exchange.fetch_my_trades(symbol)
+        related = [t for t in trades if t.get("order") == order_id]
+        cost = sum(t["cost"] for t in related)
+        fee  = sum(t["fee"]["cost"] for t in related if t.get("fee"))
+        side = related[0]["side"] if related else None
+        return cost, fee, side
+
+    cost_primary, fee_primary, side_primary = get_summary(primary, primary_order_id)
+    cost_secondary, fee_secondary, side_secondary = get_summary(secondary, secondary_order_id)
+    print(f"{cost_primary} {fee_primary} {side_primary}")
+    print(f"{cost_secondary} {fee_secondary} {side_secondary}")
+    if side_primary == "buy":
+        return (cost_secondary - fee_secondary) - (cost_primary + fee_primary)
+    else:
+        return (cost_primary - fee_primary) - (cost_secondary + fee_secondary)
 
 def get_filled_size(exchange_code, order):
     if exchange_code == ExchangesCode.BITMART.value:
