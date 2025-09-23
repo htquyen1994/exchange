@@ -86,7 +86,8 @@ class Manager:
         bot = telebot.TeleBot(TelegramSetting.TOKEN)
         current_time = datetime.datetime.now()
         watcher = None
-        is_rebalancing_flag = False
+        is_rebalancing = False
+        last_warning_time = None   
 
         while True:
             __pending_queue = None
@@ -138,12 +139,14 @@ class Manager:
                     primary_coin_condition = (primary_amount_coin * primary_buy_price) < 10
                     wallet_not_enough = secondary_amount_usdt < 10 or primary_amount_usdt < 10 or secondary_coin_condition or primary_coin_condition
                     if wallet_not_enough:
-                        if not is_rebalancing_flag:
+                        if not is_rebalancing:
                             try:
-                                rebalancing(primary_ccxt, secondary_ccxt, symbol, self.shared_config.auto_rebalance)
-                                is_rebalancing_flag = True
+                                rebalancing(primary_ccxt, secondary_ccxt, symbol,
+                                            primary_orderbook, secondary_orderbook,
+                                            self.shared_config.auto_rebalance, TradeSetting.ARBITRAGE_THRESHOLD)
+                                is_rebalancing = True
                             except Exception as ex:
-                                is_rebalancing_flag = False
+                                is_rebalancing = False
                                 send_error_telegram(ex, "Rebalancing Failed", bot)
                                 sleep(10)
                         msg = "Warning exchange {0}/{1}".format(
@@ -152,11 +155,11 @@ class Manager:
                         )
                         msg = msg + "\n COIN {0} / {1}".format(primary_amount_coin, secondary_amount_coin)
                         msg = msg + "\n USDT {0} / {1}".format(primary_amount_usdt, secondary_amount_usdt)
-                        if (datetime.datetime.now() - current_time).total_seconds() >= 600:
+                        if last_warning_time is None or (datetime.datetime.now() - last_warning_time).total_seconds() >= 600:
                             bot.send_message(TelegramSetting.CHAT_WARNING_ID, msg)
-                            current_time = datetime.datetime.now()
+                            last_warning_time = datetime.datetime.now()
                     else:
-                        is_rebalancing_flag = False
+                        is_rebalancing = False
 
                     # mua sàn secondary - bán sàn primary
                     if primary_sell_price > TradeSetting.ARBITRAGE_THRESHOLD * secondary_buy_price:

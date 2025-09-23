@@ -11,11 +11,12 @@ SECONDARY_COIN_ADDRESS = TradeEnv.SECONDARY_COIN_ADDRESS
 SECONDARY_USDT_ADDRESS = TradeEnv.SECONDARY_USDT_ADDRESS
 COIN_NETWORK = TradeEnv.COIN_NETWORK
 USDT_NETWORK = TradeEnv.USDT_NETWORK
-PRIMARY_COIN_RATIO = TradeEnv.PRIMARY_COIN_RATIO
-SECONDARY_COIN_RATIO = TradeEnv.SECONDARY_COIN_RATIO
-MAX_COIN_WITHDRAW = TradeEnv.MAX_COIN_WITHDRAW
+COIN_RATIO = TradeEnv.COIN_RATIO
+COIN_REBALANCE_THRESHOLD = TradeEnv.COIN_REBALANCE_THRESHOLD
 
-def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str, auto_rebalance: bool):
+def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str, 
+                primary_order_book, secondary_order_book, 
+                auto_rebalance: bool, threshold: float):
     """
     Rebalance USDT and coin between two exchanges
 
@@ -23,11 +24,12 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str, a
         primary: Primary exchange instance
         secondary: Secondary exchange instance
         symbol: Trading pair symbol (e.g., "BTC/USDT")
+        trend: trading trend, e.g. "sell_primary" or "buy_primary"
     """
     if not auto_rebalance:
         print("Auto rebalance if OFF")
         return
-
+    trend = detect_trend(primary_order_book, secondary_order_book, threshold)
     trading_data = load_trading_data()
     total_fees = trading_data.get("total_fees", 0)
     if (
@@ -88,9 +90,12 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str, a
             else:
                 print(f"Pending USDT withdrawal detected on {primary.id}, skip withdraw")
 
+        if not trend:
+            print("No Trend arbitrage.")
+            return
         # Transfer coin: secondary -> primary
-        if primary_coin <= MAX_COIN_WITHDRAW:
-            transfer_amount = total_coin * PRIMARY_COIN_RATIO - primary_coin
+        if trend == "sell_primary" and primary_coin <= COIN_REBALANCE_THRESHOLD:
+            transfer_amount = total_coin * COIN_RATIO - primary_coin
             if can_withdraw(secondary, base_coin):
                 if transfer_amount > 0 and transfer_amount <= secondary_coin:
                     transaction = secondary.withdraw(
@@ -108,9 +113,9 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str, a
                 print(f"Pending Coin withdrawal detected on {secondary.id}, skip withdraw")
 
         # Transfer coin: primary -> secondary
-        elif secondary_coin <= MAX_COIN_WITHDRAW:
+        elif  trend == "buy_primary" and secondary_coin <= COIN_REBALANCE_THRESHOLD:
             if can_withdraw(primary, base_coin):
-                transfer_amount = total_coin * SECONDARY_COIN_RATIO - secondary_coin
+                transfer_amount = total_coin * COIN_RATIO - secondary_coin
                 if transfer_amount > 0 and transfer_amount <= primary_coin:
                     transaction = primary.withdraw(
                         base_coin,
@@ -171,3 +176,24 @@ def can_withdraw(exchange: ccxt.Exchange, currency: str):
         print(f"Warning: fetch_withdrawals not supported on {exchange.id}, {e}")
         return True
 
+def detect_trend(primary_order_book, secondary_order_book, threshold: float = 1.002):
+    try:
+        primary_bid = primary_order_book["bids"][0][0] if primary_order_book["bids"] else None
+        primary_ask = primary_order_book["asks"][0][0] if primary_order_book["asks"] else None
+        secondary_bid = secondary_order_book["bids"][0][0] if secondary_order_book["bids"] else None
+        secondary_ask = secondary_order_book["asks"][0][0] if secondary_order_book["asks"] else None
+
+        if not all([primary_bid, primary_ask, secondary_bid, secondary_ask]):
+            return None
+
+        # Trigger earlier than the strict threshold
+        if primary_bid > secondary_ask * threshold * 0.9:
+            return "sell_primary"
+        elif secondary_bid > primary_ask * threshold * 0.9:
+            return "buy_primary"
+        else:
+            return None
+
+    except Exception as e:
+        print(f"Error detecting trend: {e}")
+        return None
