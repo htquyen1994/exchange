@@ -152,6 +152,50 @@ paths:
           schema:
             $ref: "#/definitions/CommonResponse"
       x-swagger-router-controller: "swagger_server.controllers.ping_controller"
+
+  /rebalance/toggle:
+    post:
+      tags:
+      - "Rebalance"
+      summary: "Toggle auto rebalance"
+      description: "Enable or disable auto rebalance"
+      operationId: "rebalance_toggle_post"
+      parameters:
+      - in: "body"
+        name: "ToggleRequest"
+        description: "Set auto rebalance true/false"
+        required: true
+        schema:
+          $ref: "#/definitions/RebalanceToggleRequest"
+      responses:
+        "200":
+          description: "Success"
+          schema:
+            $ref: "#/definitions/CommonResponse"
+        default:
+          description: "HTTP error"
+          schema:
+            $ref: "#/definitions/CommonResponse"
+      x-swagger-router-controller: "swagger_server.controllers.rebalance_controller"
+
+  /rebalance/status:
+    get:
+      tags:
+      - "Rebalance"
+      summary: "Get auto rebalance status"
+      description: "Check current status of auto rebalance"
+      operationId: "rebalance_status_get"
+      parameters: []
+      responses:
+        "200":
+          description: "Success"
+          schema:
+            $ref: "#/definitions/CommonResponse"
+        default:
+          description: "HTTP error"
+          schema:
+            $ref: "#/definitions/CommonResponse"
+      x-swagger-router-controller: "swagger_server.controllers.rebalance_controller"
 definitions:
   LoginRequest:
     type: "object"
@@ -418,6 +462,14 @@ definitions:
       info:
       - "info"
       - "info"
+  
+  RebalanceToggleRequest:
+    type: object
+    required:
+      - enabled
+    properties:
+      enabled:
+        type: boolean
 responses:
   CommonResponse:
     description: "HTTP error code response.\n200=Success\n400=Invalid parameter\n\

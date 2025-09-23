@@ -76,3 +76,33 @@ class ExchangeLogic:
             return resp, 200
         except Exception as ex:
             print("ExchangeLogic.configure_post::".format(ex.__str__()))
+    
+    @classmethod
+    @require_authenticate
+    @Util.system_error_handler
+    def rebalance_toggle_post(cls, ToggleRequest):
+        try:
+            # body: {"enabled": true/false}
+            if "enabled" not in ToggleRequest:
+                raise ValueError("Missing 'enabled' field")
+
+            enabled = bool(ToggleRequest["enabled"])
+            Manager.get_instance().set_auto_rebalance(enabled)
+
+            resp = CommonResponse()
+            resp.message = enabled
+            return resp, 200
+        except Exception as ex:
+            print("ExchangeLogic.rebalance_toggle_post::{}".format(ex.__str__()))
+
+
+    @classmethod
+    @require_authenticate
+    @Util.system_error_handler
+    def rebalance_status_get(cls):
+        try:
+            resp = CommonResponse()
+            resp.message = Manager.get_instance().get_auto_rebalance()
+            return resp, 200
+        except Exception as ex:
+            print("ExchangeLogic.rebalance_status_get::{}".format(ex.__str__()))

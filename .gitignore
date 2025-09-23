@@ -52,4 +52,5 @@ dmypy.json
 # System files
 .DS_Store
 Thumbs.db
-
+# Trading data file (persistent profit/orders)
+trading_data.json
