@@ -232,8 +232,14 @@ class Manager:
                             current_time = datetime.datetime.now()
                     sleep(0.01)
                 except Exception as ex:
-                    print("Error: {}".format(str(ex)))
-                    send_error_telegram(ex, "Main Trading Loop", bot)
+                    debug_info = {
+                        "primary_balance": primary_balance if 'primary_balance' in locals() else None,
+                        "secondary_balance": secondary_balance if 'secondary_balance' in locals() else None,
+                        "last_quantity": quantity if 'quantity' in locals() else None
+                    }
+                    print("Error: {} | Debug: {}".format(str(ex), debug_info))
+                    send_error_telegram(f"{ex}\n\nDebug: {debug_info}", "Main Trading Loop", bot)
+                    sleep(10)
 
             if watcher is not None:
                 watcher.stop()
