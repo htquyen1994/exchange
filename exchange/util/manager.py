@@ -238,7 +238,9 @@ class Manager:
                     debug_info = {
                         "primary_balance": primary_balance if 'primary_balance' in locals() else None,
                         "secondary_balance": secondary_balance if 'secondary_balance' in locals() else None,
-                        "last_quantity": quantity if 'quantity' in locals() else None
+                        "sell_price": sell_price if 'sell_price' in locals() else None,
+                        "buy_price": buy_price if 'buy_price' in locals() else None,
+                        "quantity": quantity if 'quantity' in locals() else None
                     }
                     print("Error: {} | Debug: {}".format(str(ex), debug_info))
                     send_error_telegram(f"{ex}\n\nDebug: {debug_info}", "Main Trading Loop", bot)
