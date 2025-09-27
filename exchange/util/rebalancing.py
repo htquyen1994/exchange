@@ -16,7 +16,7 @@ COIN_REBALANCE_THRESHOLD = TradeEnv.COIN_REBALANCE_THRESHOLD
 
 def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str, 
                 primary_order_book, secondary_order_book, 
-                auto_rebalance: bool, threshold: float):
+                auto_rebalance: bool):
     """
     Rebalance USDT and coin between two exchanges
 
@@ -29,7 +29,7 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
     if not auto_rebalance:
         print("Auto rebalance if OFF")
         return
-    trend = detect_trend(primary_order_book, secondary_order_book, threshold)
+    trend = detect_trend(primary_order_book, secondary_order_book)
     trading_data = load_trading_data()
     total_fees = trading_data.get("total_fees", 0)
     if (
@@ -176,7 +176,7 @@ def can_withdraw(exchange: ccxt.Exchange, currency: str):
         print(f"Warning: fetch_withdrawals not supported on {exchange.id}, {e}")
         return True
 
-def detect_trend(primary_order_book, secondary_order_book, threshold: float = 1.002):
+def detect_trend(primary_order_book, secondary_order_book):
     try:
         primary_bid = primary_order_book["bids"][0][0] if primary_order_book["bids"] else None
         primary_ask = primary_order_book["asks"][0][0] if primary_order_book["asks"] else None
@@ -187,9 +187,9 @@ def detect_trend(primary_order_book, secondary_order_book, threshold: float = 1.
             return None
 
         # Trigger earlier than the strict threshold
-        if primary_bid > secondary_ask * threshold * 0.9:
+        if primary_bid > secondary_ask:
             return "sell_primary"
-        elif secondary_bid > primary_ask * threshold * 0.9:
+        elif secondary_bid > primary_ask:
             return "buy_primary"
         else:
             return None

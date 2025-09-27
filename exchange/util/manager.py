@@ -143,7 +143,7 @@ class Manager:
                             try:
                                 rebalancing(primary_ccxt, secondary_ccxt, symbol,
                                             primary_orderbook, secondary_orderbook,
-                                            self.shared_config.auto_rebalance, TradeSetting.ARBITRAGE_THRESHOLD)
+                                            self.shared_config.auto_rebalance)
                                 is_rebalancing = True
                             except Exception as ex:
                                 is_rebalancing = False
