@@ -71,3 +71,6 @@ class TradeEnv:
 
     COIN_RATIO = float(os.getenv("COIN_RATIO", 0.5))
     COIN_REBALANCE_THRESHOLD = int(os.getenv("COIN_REBALANCE_THRESHOLD",60))
+
+    PRIMARY_FEE_TAKER = float(os.getenv("PRIMARY_FEE_TAKER", 0.06))
+    SECONDARY_FEE_TAKER = float(os.getenv("SECONDARY_FEE_TAKER", 0.06))

@@ -2,7 +2,7 @@ import datetime
 import multiprocessing
 from multiprocessing import Process, Event, Queue
 from time import sleep
-from config.config import TradeSetting, TelegramSetting, ExchangeNotionalSetting
+from config.config import TradeSetting, TelegramSetting, ExchangeNotionalSetting, TradeEnv
 from exchange.models.order_status import OrderStatus
 from exchange.util.ccxt_manager import CcxtManager
 from exchange.util.exchange_pending_thread import ExchangePendingThread
@@ -166,7 +166,10 @@ class Manager:
                         trade_info = maximum_quantity_trade_able(secondary_orderbook, primary_orderbook, TradeSetting.ARBITRAGE_THRESHOLD, TradeSetting.MAX_TRADE_QUANTITY)
                         sell_price = trade_info["sell_price"]
                         buy_price = trade_info["buy_price"]
-                        quantity =min(trade_info["quantity"], primary_amount_coin, secondary_amount_usdt/buy_price) 
+                        quantity =min(trade_info["quantity"],
+                                      primary_amount_coin,
+                                      secondary_amount_usdt*(1-TradeEnv.SECONDARY_FEE_TAKER)/buy_price
+                        )
 
                         precision_invalid = (quantity * buy_price) <= secondary_min_notional or (
                                 quantity * sell_price) <= primary_min_notional
@@ -200,7 +203,10 @@ class Manager:
                         trade_info = maximum_quantity_trade_able(primary_orderbook, secondary_orderbook, TradeSetting.ARBITRAGE_THRESHOLD, TradeSetting.MAX_TRADE_QUANTITY)
                         sell_price = trade_info["sell_price"]
                         buy_price = trade_info["buy_price"]
-                        quantity =min(trade_info["quantity"], secondary_amount_coin, primary_amount_usdt/buy_price) 
+                        quantity =min(trade_info["quantity"],
+                                      secondary_amount_coin,
+                                      primary_amount_usdt*(1-TradeEnv.PRIMARY_FEE_TAKER)/buy_price
+                        ) 
 
                         precision_invalid = (quantity * sell_price) <= secondary_min_notional or (
                                 quantity * buy_price) <= primary_min_notional
