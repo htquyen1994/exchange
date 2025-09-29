@@ -196,6 +196,7 @@ class Manager:
                             msg_transaction = {'primary': primary_pending_order,
                                                 'secondary': secondary_pending_order}
                             __pending_queue.put(msg_transaction)
+                            current_time = datetime.datetime.now()
                         
 
                     # mua sàn primary - bán sàn secondary
@@ -233,9 +234,10 @@ class Manager:
                             msg_transaction = {'primary': primary_pending_order,
                                                 'secondary': secondary_pending_order}
                             __pending_queue.put(msg_transaction)
+                            current_time = datetime.datetime.now()
 
                     else:
-                        if (datetime.datetime.now() - current_time).total_seconds() >= 600:
+                        if (datetime.datetime.now() - current_time).total_seconds() >= 3*3600:
                             print("Waiting...")
                             bot.send_message(TelegramSetting.CHAT_ID, "Trading status is waiting - not match")
                             current_time = datetime.datetime.now()
