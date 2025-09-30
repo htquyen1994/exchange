@@ -1,7 +1,9 @@
 import ccxt
 import telebot
+import datetime
 from config.config import TelegramSetting, TradeEnv
 from config.profit_tracker import load_trading_data, save_trading_data
+from exchange.util.order_executor import execute_orders_concurrently
 _fee_cache = {}
 
 
@@ -11,27 +13,80 @@ SECONDARY_COIN_ADDRESS = TradeEnv.SECONDARY_COIN_ADDRESS
 SECONDARY_USDT_ADDRESS = TradeEnv.SECONDARY_USDT_ADDRESS
 COIN_NETWORK = TradeEnv.COIN_NETWORK
 USDT_NETWORK = TradeEnv.USDT_NETWORK
-COIN_RATIO = TradeEnv.COIN_RATIO
-COIN_REBALANCE_THRESHOLD = TradeEnv.COIN_REBALANCE_THRESHOLD
+REBALANCE_RATIO = TradeEnv.REBALANCE_RATIO
+REBALANCE_THRESHOLD = TradeEnv.REBALANCE_THRESHOLD
+
+class RebalancingManager:
+    def __init__(self):
+        self.is_rebalancing = False
+        self.last_warning_time = None
+        self.bot = telebot.TeleBot(TelegramSetting.TOKEN)
+
+    def should_send_warning(self, warning_interval_seconds=600):
+        if self.last_warning_time is None:
+            return True
+        return (datetime.datetime.now() - self.last_warning_time).total_seconds() >= warning_interval_seconds
+    
+    def check_wallet_conditions(self, primary_balance, secondary_balance, 
+                                primary_buy_price, secondary_buy_price):
+        primary_usdt = primary_balance.get("amount_usdt", {}).get("total", 0)
+        primary_coin = primary_balance.get('amount_coin', {}).get("total", 0)
+        secondary_usdt = secondary_balance.get("amount_usdt", {}).get("total", 0)
+        secondary_coin = secondary_balance.get('amount_coin', {}).get("total", 0)
+        total_usdt = primary_usdt + secondary_usdt
+
+        wallet_not_enough = (
+            primary_usdt < total_usdt * (1 - REBALANCE_RATIO) or 
+            secondary_usdt < total_usdt * (1 - REBALANCE_RATIO) or 
+            secondary_coin * secondary_buy_price < REBALANCE_THRESHOLD or 
+            primary_coin * primary_buy_price < REBALANCE_THRESHOLD
+        )
+        
+        return wallet_not_enough
+    
+    def handle_low_balance(self, primary_ccxt, secondary_ccxt, symbol,
+                          primary_orderbook, secondary_orderbook,
+                          primary_balance, secondary_balance,
+                          auto_rebalance):
+        if not self.is_rebalancing:
+            try:
+                _is_rebalancing = rebalancing(primary_ccxt, secondary_ccxt, symbol,
+                          primary_orderbook, secondary_orderbook,
+                          primary_balance, secondary_balance,
+                          auto_rebalance)
+                self.is_rebalancing = _is_rebalancing
+            except Exception as ex:
+                self.is_rebalancing = False
+                from exchange.util.telegram_utils import send_error_telegram
+                send_error_telegram(ex, "Rebalancing Failed", self.bot)
+                raise
+        if self.should_send_warning():
+            primary_code = primary_ccxt.id
+            secondary_code = secondary_ccxt.id
+            msg = f"Warning exchange {primary_code}/{secondary_code}"
+            msg += f"\n COIN {primary_balance['amount_coin']['total']:.2f} / {secondary_balance['amount_coin']['total']:.2f}"
+            msg += f"\n USDT {primary_balance['amount_usdt']['total']:.2f} / {secondary_balance['amount_usdt']['total']:.2f}"
+            self.bot.send_message(TelegramSetting.CHAT_WARNING_ID, msg)
+            self.last_warning_time = datetime.datetime.now()
+    
+    def reset_rebalancing_state(self):
+        self.is_rebalancing = False
 
 def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str, 
-                primary_order_book, secondary_order_book, 
+                primary_order_book, secondary_order_book,
+                primary_balance, secondary_balance,
                 auto_rebalance: bool):
-    """
-    Rebalance USDT and coin between two exchanges
-
-    Args:
-        primary: Primary exchange instance
-        secondary: Secondary exchange instance
-        symbol: Trading pair symbol (e.g., "BTC/USDT")
-        trend: trading trend, e.g. "sell_primary" or "buy_primary"
-    """
+    
     if not auto_rebalance:
         print("Auto rebalance if OFF")
-        return
+        return False
     trend = detect_trend(primary_order_book, secondary_order_book)
+    if not trend:
+        print("No Trend arbitrage.")
+        return False
     trading_data = load_trading_data()
     total_fees = trading_data.get("total_fees", 0)
+    is_withdraw = False
     if (
         not PRIMARY_COIN_ADDRESS
         or not SECONDARY_COIN_ADDRESS
@@ -47,57 +102,24 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
     base_coin = symbol.replace("/USDT", "")
     primary_fee = get_fee(primary, base_coin, COIN_NETWORK)
     secondary_fee = get_fee(secondary, base_coin, COIN_NETWORK)
+        
     try:
-        primary_balance = primary.fetch_balance()
-        secondary_balance = secondary.fetch_balance()
+        primary_bid = primary_order_book["bids"][0][0] if primary_order_book["bids"] else None
+        secondary_bid = secondary_order_book["bids"][0][0] if secondary_order_book["bids"] else None
 
-        primary_usdt = primary_balance.get("USDT", {}).get("total", 0)
-        primary_coin = primary_balance.get(base_coin, {}).get("total", 0)
-        secondary_usdt = secondary_balance.get("USDT", {}).get("total", 0)
-        secondary_coin = secondary_balance.get(base_coin, {}).get("total", 0)
+        primary_usdt = primary_balance.get("amount_usdt", {}).get("total", 0)
+        primary_coin = primary_balance.get('amount_coin', {}).get("total", 0)
+        secondary_usdt = secondary_balance.get("amount_usdt", {}).get("total", 0)
+        secondary_coin = secondary_balance.get('amount_coin', {}).get("total", 0)
 
         total_usdt = primary_usdt + secondary_usdt
         total_coin = primary_coin + secondary_coin
 
-        # 30% threshold
-        # Transfer USDT: secondary -> primary
-        if primary_usdt < total_usdt * 0.3:
-            if can_withdraw(secondary, "USDT"):
-                transfer_amount = total_usdt / 2 - primary_usdt
-                transaction = secondary.withdraw(
-                    "USDT",
-                    round(transfer_amount, 4),
-                    PRIMARY_USDT_ADDRESS,
-                    tag=None,
-                    params={"network": USDT_NETWORK},
-                )
-                print(f"USDT withdrawal transaction: {transaction}")
-            else:
-                print(f"Pending USDT withdrawal detected on {secondary.id}, skip withdraw")
-
-        # Transfer USDT: primary -> secondary
-        elif secondary_usdt < total_usdt * 0.3:
-            if can_withdraw(primary, "USDT"):
-                transfer_amount = total_usdt / 2 - secondary_usdt
-                transaction = primary.withdraw(
-                    "USDT",
-                    round(transfer_amount, 4),
-                    SECONDARY_USDT_ADDRESS,
-                    tag=None,
-                    params={"network": USDT_NETWORK},
-                )
-                print(f"USDT withdrawal transaction: {transaction}")
-            else:
-                print(f"Pending USDT withdrawal detected on {primary.id}, skip withdraw")
-
-        if not trend:
-            print("No Trend arbitrage.")
-            return
-        # Transfer coin: secondary -> primary
-        if trend == "sell_primary" and primary_coin <= COIN_REBALANCE_THRESHOLD:
-            transfer_amount = total_coin * COIN_RATIO - primary_coin
-            if can_withdraw(secondary, base_coin):
-                if transfer_amount > 0 and transfer_amount <= secondary_coin:
+        if trend == "sell_primary":
+            # Transfer coin: secondary -> primary
+            if primary_coin * primary_bid < REBALANCE_THRESHOLD:
+                transfer_amount = total_coin * REBALANCE_RATIO - primary_coin
+                if can_withdraw(secondary, base_coin) and transfer_amount > 0 and transfer_amount <= secondary_coin:
                     transaction = secondary.withdraw(
                         base_coin,
                         round(transfer_amount, 4),
@@ -106,17 +128,31 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
                         params={"network": COIN_NETWORK},
                     )
                     total_fees += secondary_fee
+                    is_withdraw = True
                     message = f"{base_coin}: {secondary.id} -> {primary.id}\nAmount: {transfer_amount:.2f}\nFees: {secondary_fee} {base_coin}\nTotal Fees: {total_fees} {base_coin}"
                     bot.send_message(TelegramSetting.CHAT_ID, message)
                     print(message)
+                else:
+                    print(f"Pending Coin withdrawal detected on {secondary.id}, skip withdraw")
+            # Transfer USDT: primary -> secondary
+            transfer_amount = total_usdt * REBALANCE_RATIO - secondary_usdt
+            if can_withdraw(primary, "USDT") and transfer_amount > 0 and transfer_amount <= primary_usdt:
+                transaction = primary.withdraw(
+                    "USDT",
+                    round(transfer_amount, 4),
+                    SECONDARY_USDT_ADDRESS,
+                    tag=None,
+                    params={"network": USDT_NETWORK},
+                )
+                is_withdraw = True
+                print(f"USDT withdrawal transaction: {transaction}")
             else:
-                print(f"Pending Coin withdrawal detected on {secondary.id}, skip withdraw")
-
-        # Transfer coin: primary -> secondary
-        elif  trend == "buy_primary" and secondary_coin <= COIN_REBALANCE_THRESHOLD:
-            if can_withdraw(primary, base_coin):
-                transfer_amount = total_coin * COIN_RATIO - secondary_coin
-                if transfer_amount > 0 and transfer_amount <= primary_coin:
+                print(f"Pending USDT withdrawal detected on {primary.id}, skip withdraw")
+        elif  trend == "buy_primary":
+            # Transfer coin: primary -> secondary
+            if secondary_coin * secondary_bid < REBALANCE_THRESHOLD:
+                transfer_amount = total_coin * REBALANCE_RATIO - secondary_coin
+                if can_withdraw(primary, base_coin) and transfer_amount > 0 and transfer_amount <= primary_coin:
                     transaction = primary.withdraw(
                         base_coin,
                         round(transfer_amount, 4),
@@ -125,12 +161,26 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
                         params={"network": COIN_NETWORK},
                     )
                     total_fees += primary_fee
+                    is_withdraw = True
                     message = f"{base_coin}: {primary.id} -> {secondary.id}\nAmount: {transfer_amount:.2f}\nFees: {primary_fee} {base_coin}\nTotal Fees: {total_fees} {base_coin}"
                     bot.send_message(TelegramSetting.CHAT_ID, message)
                     print(message)
+                else:
+                    print(f"Pending Coin withdrawal detected on {primary.id}, skip withdraw")
+            # Transfer USDT: secondary -> primary
+            transfer_amount = total_usdt * REBALANCE_RATIO - primary_usdt
+            if can_withdraw(secondary, "USDT") and transfer_amount > 0 and transfer_amount <= secondary_usdt:
+                transaction = secondary.withdraw(
+                    "USDT",
+                    round(transfer_amount, 4),
+                    PRIMARY_USDT_ADDRESS,
+                    tag=None,
+                    params={"network": USDT_NETWORK},
+                )
+                is_withdraw = True
+                print(f"USDT withdrawal transaction: {transaction}")
             else:
-                print(f"Pending Coin withdrawal detected on {primary.id}, skip withdraw")
-        
+                print(f"Pending USDT withdrawal detected on {secondary.id}, skip withdraw")
         save_trading_data(total_fees=total_fees)
 
     except ccxt.NetworkError as e:
@@ -147,7 +197,7 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
         error_msg = f"Unexpected error during rebalancing: {str(e)}"
         print(error_msg)
         raise
-
+    return is_withdraw
 
 def get_fee(exchange: ccxt.Exchange, coin: str, network: str):
     global _fee_cache

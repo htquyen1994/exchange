@@ -13,7 +13,7 @@ from exchange.util.log_agent import LoggerAgent
 from exchange.util.order_executor import execute_orders_concurrently
 from exchange.util.telegram_utils import send_error_telegram
 from exchange.util.ws_orderbook_watcher import WSOrderbookWatcher
-from exchange.util.rebalancing import rebalancing
+from exchange.util.rebalancing import RebalancingManager
 
 class Manager:
     start_flag = True
@@ -86,8 +86,7 @@ class Manager:
         bot = telebot.TeleBot(TelegramSetting.TOKEN)
         current_time = datetime.datetime.now()
         watcher = None
-        is_rebalancing = False
-        last_warning_time = None   
+        rebalance_manager = RebalancingManager()
 
         while True:
             __pending_queue = None
@@ -127,39 +126,27 @@ class Manager:
 
                     primary_sell_price = primary_orderbook['bids'][0][0]
                     primary_buy_price = primary_orderbook['asks'][0][0]
-                    primary_amount_usdt = primary_balance['amount_usdt']
-                    primary_amount_coin = primary_balance['amount_coin']
-
+                    primary_amount_usdt = primary_balance.get("amount_usdt", {}).get("free", 0)
+                    primary_amount_coin = primary_balance.get('amount_coin', {}).get("free", 0)
                     secondary_sell_price = secondary_orderbook['bids'][0][0]
                     secondary_buy_price = secondary_orderbook['asks'][0][0]
-                    secondary_amount_usdt = secondary_balance['amount_usdt']
-                    secondary_amount_coin = secondary_balance['amount_coin']
+                    secondary_amount_usdt = secondary_balance.get("amount_usdt", {}).get("free", 0)
+                    secondary_amount_coin = secondary_balance.get('amount_coin', {}).get("free", 0)
                     
-                    secondary_coin_condition = (secondary_amount_coin * secondary_buy_price) < 10
-                    primary_coin_condition = (primary_amount_coin * primary_buy_price) < 10
-                    wallet_not_enough = secondary_amount_usdt < 10 or primary_amount_usdt < 10 or secondary_coin_condition or primary_coin_condition
+                    wallet_not_enough = rebalance_manager.check_wallet_conditions(
+                        primary_balance, secondary_balance,
+                        primary_buy_price, secondary_buy_price
+                    )
+                    
                     if wallet_not_enough:
-                        if not is_rebalancing:
-                            try:
-                                rebalancing(primary_ccxt, secondary_ccxt, symbol,
-                                            primary_orderbook, secondary_orderbook,
-                                            self.shared_config.auto_rebalance)
-                                is_rebalancing = True
-                            except Exception as ex:
-                                is_rebalancing = False
-                                send_error_telegram(ex, "Rebalancing Failed", bot)
-                                sleep(10)
-                        msg = "Warning exchange {0}/{1}".format(
-                            primary_code,
-                            secondary_code
+                        rebalance_manager.handle_low_balance(
+                            primary_ccxt, secondary_ccxt, symbol,
+                            primary_orderbook, secondary_orderbook,
+                            primary_balance, secondary_balance,
+                            self.shared_config.auto_rebalance
                         )
-                        msg = msg + "\n COIN {0} / {1}".format(primary_amount_coin, secondary_amount_coin)
-                        msg = msg + "\n USDT {0} / {1}".format(primary_amount_usdt, secondary_amount_usdt)
-                        if last_warning_time is None or (datetime.datetime.now() - last_warning_time).total_seconds() >= 600:
-                            bot.send_message(TelegramSetting.CHAT_WARNING_ID, msg)
-                            last_warning_time = datetime.datetime.now()
                     else:
-                        is_rebalancing = False
+                        rebalance_manager.reset_rebalancing_state()
 
                     # mua sàn secondary - bán sàn primary
                     if primary_sell_price > TradeSetting.ARBITRAGE_THRESHOLD * secondary_buy_price:
@@ -197,7 +184,6 @@ class Manager:
                                                 'secondary': secondary_pending_order}
                             __pending_queue.put(msg_transaction)
                             current_time = datetime.datetime.now()
-                        
 
                     # mua sàn primary - bán sàn secondary
                     elif secondary_sell_price > TradeSetting.ARBITRAGE_THRESHOLD * primary_buy_price:
@@ -235,7 +221,6 @@ class Manager:
                                                 'secondary': secondary_pending_order}
                             __pending_queue.put(msg_transaction)
                             current_time = datetime.datetime.now()
-
                     else:
                         if (datetime.datetime.now() - current_time).total_seconds() >= 3*3600:
                             print("Waiting...")
@@ -275,15 +260,22 @@ class Manager:
 
 def get_balance(ccxt_instance, symbol):
     balance = ccxt_instance.fetch_balance()
-    result = {'amount_usdt': 0.0, 'amount_coin': 0.0}
-
+    result = {
+        'amount_usdt': {
+            "free": 0.0,
+            "used": 0.0,
+            "total": 0.0
+        }, 
+        'amount_coin': {
+            "free": 0.0,
+            "used": 0.0,
+            "total": 0.0
+        }
+    }
     if balance is not None and balance.get('free') is not None:
         base_coin = symbol.split('/')[0]
-        for currency, amount in balance['free'].items():
-            if currency == "USDT":
-                result['amount_usdt'] = float(amount)
-            if currency == base_coin:
-                result['amount_coin'] = float(amount)
+        result['amount_usdt'] = balance.get("USDT")
+        result['amount_coin'] = balance.get(base_coin)
         return result
 
     return None
@@ -309,8 +301,8 @@ def maximum_quantity_trade_able(buy_order_book, sell_order_book, threshold, max_
     bids = deque([list(x) for x in sell_order_book["bids"]])
 
     result = {
-        "buy_price": 0,
-        "sell_price": 0,
+        "buy_price": asks[0][0],
+        "sell_price": bids[0][0],
         "quantity": 0
     }
 
