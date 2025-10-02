@@ -162,7 +162,8 @@ class Manager:
                                 quantity * sell_price) <= primary_min_notional
                         if precision_invalid:
                             if (datetime.datetime.now() - current_time).total_seconds() >= 600:
-                                bot.send_message(TelegramSetting.CHAT_ID, "Volume small, SKIP")
+                                reason = "Volume small, SKIP" if quantity == trade_info["quantity"] else f"Insufficient balance {quantity}"
+                                bot.send_message(TelegramSetting.CHAT_ID, reason)
                                 current_time = datetime.datetime.now()
                             sleep(0.1)
                             continue
@@ -199,7 +200,8 @@ class Manager:
                                 quantity * buy_price) <= primary_min_notional
                         if precision_invalid:
                             if (datetime.datetime.now() - current_time).total_seconds() >= 600:
-                                bot.send_message(TelegramSetting.CHAT_ID, "Volume small, SKIP")
+                                reason = "Volume small, SKIP" if quantity == trade_info["quantity"] else f"Insufficient balance {quantity}"
+                                bot.send_message(TelegramSetting.CHAT_ID, reason)
                                 current_time = datetime.datetime.now()
                             sleep(0.1)
                             continue
