@@ -274,13 +274,15 @@ def get_balance(ccxt_instance, symbol):
             "total": 0.0
         }
     }
-    if balance is not None and balance.get('free') is not None:
-        base_coin = symbol.split('/')[0]
-        result['amount_usdt'] = balance.get("USDT")
-        result['amount_coin'] = balance.get(base_coin)
-        return result
 
-    return None
+    if balance and balance.get("free") is not None:
+        base_coin = symbol.split('/')[0]
+        if balance.get("USDT") is not None:
+            result["amount_usdt"] = balance["USDT"]
+        if balance.get(base_coin) is not None:
+            result["amount_coin"] = balance[base_coin]
+
+    return result
 
 def get_min_notional(exchange_code: str) -> float:
     return ExchangeNotionalSetting.MIN.get(exchange_code.upper(), ExchangeNotionalSetting.MIN["DEFAULT"])
