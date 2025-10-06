@@ -36,8 +36,8 @@ class RebalancingManager:
         total_usdt = primary_usdt + secondary_usdt
 
         wallet_not_enough = (
-            primary_usdt < total_usdt * (1 - REBALANCE_RATIO) or 
-            secondary_usdt < total_usdt * (1 - REBALANCE_RATIO) or 
+            primary_usdt < total_usdt * (1 - REBALANCE_RATIO) *  0.75 or 
+            secondary_usdt < total_usdt * (1 - REBALANCE_RATIO) * 0.75 or 
             secondary_coin * secondary_buy_price < REBALANCE_THRESHOLD or 
             primary_coin * primary_buy_price < REBALANCE_THRESHOLD
         )
@@ -78,9 +78,9 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
                 auto_rebalance: bool):
     
     if not auto_rebalance:
-        print("Auto rebalance if OFF")
+        print("Auto rebalance is OFF")
         return False
-    trend = detect_trend(primary_order_book, secondary_order_book)
+    trend = detect_trend(primary_order_book, secondary_order_book, TradeEnv.TREND_THRESHOLD)
     if not trend:
         print("No Trend arbitrage.")
         return False
@@ -119,66 +119,94 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
             # Transfer coin: secondary -> primary
             if primary_coin * primary_bid < REBALANCE_THRESHOLD:
                 transfer_amount = total_coin * REBALANCE_RATIO - primary_coin
-                if can_withdraw(secondary, base_coin) and transfer_amount > 0 and transfer_amount <= secondary_coin:
-                    transaction = secondary.withdraw(
-                        base_coin,
-                        round(transfer_amount, 4),
-                        PRIMARY_COIN_ADDRESS,
-                        tag=None,
-                        params={"network": COIN_NETWORK},
-                    )
-                    total_fees += secondary_fee
-                    is_withdraw = True
-                    message = f"{base_coin}: {secondary.id} -> {primary.id}\nAmount: {transfer_amount:.2f}\nFees: {secondary_fee} {base_coin}\nTotal Fees: {total_fees} {base_coin}"
-                    bot.send_message(TelegramSetting.CHAT_ID, message)
-                    print(message)
+                if can_withdraw(secondary, base_coin) and transfer_amount > 0:
+                    available_balance = secondary_balance.get('amount_coin', {}).get("free", 0)
+                    if available_balance < transfer_amount * 0.9:
+                        message = f"[{secondary.id.upper()}] ⚠️ Available balance not enough to withdraw.\n" \
+                                  f"Withdraw Amount: {transfer_amount:.4f} {base_coin}, Available: {available_balance:.4f} {base_coin}"
+                        bot.send_message(TelegramSetting.CHAT_WARNING_ID, message)
+                    else:
+                        withdraw_amount = min(available_balance, transfer_amount)
+                        transaction = secondary.withdraw(
+                            base_coin,
+                            round(withdraw_amount, 4),
+                            PRIMARY_COIN_ADDRESS,
+                            tag=None,
+                            params={"network": COIN_NETWORK},
+                        )
+                        total_fees += secondary_fee
+                        is_withdraw = True
+                        message = f"{base_coin}: {secondary.id} -> {primary.id}\nAmount: {withdraw_amount:.4f}\nFees: {secondary_fee} {base_coin}\nTotal Fees: {total_fees} {base_coin}"
+                        bot.send_message(TelegramSetting.CHAT_ID, message)
+                        print(message)
                 else:
                     print(f"Pending Coin withdrawal detected on {secondary.id}, skip withdraw")
             # Transfer USDT: primary -> secondary
             transfer_amount = total_usdt * REBALANCE_RATIO - secondary_usdt
-            if can_withdraw(primary, "USDT") and transfer_amount > 0 and transfer_amount <= primary_usdt:
-                transaction = primary.withdraw(
-                    "USDT",
-                    round(transfer_amount, 4),
-                    SECONDARY_USDT_ADDRESS,
-                    tag=None,
-                    params={"network": USDT_NETWORK},
-                )
-                is_withdraw = True
-                print(f"USDT withdrawal transaction: {transaction}")
+            if can_withdraw(primary, "USDT") and transfer_amount > 0:
+                available_balance = primary_balance.get('amount_usdt', {}).get("free", 0)
+                if available_balance < transfer_amount * 0.9:
+                    message = f"[{primary.id.upper()}] ⚠️ Available balance not enough to withdraw.\n" \
+                              f"Withdraw Amount: {transfer_amount:.4f} USDT, Available: {available_balance:.4f} USDT"
+                    bot.send_message(TelegramSetting.CHAT_WARNING_ID, message)
+                else:
+                    withdraw_amount = min(available_balance, transfer_amount)
+                    transaction = primary.withdraw(
+                        "USDT",
+                        round(withdraw_amount, 4),
+                        SECONDARY_USDT_ADDRESS,
+                        tag=None,
+                        params={"network": USDT_NETWORK},
+                    )
+                    is_withdraw = True
+                    print(f"USDT withdrawal transaction: {transaction}")
             else:
                 print(f"Pending USDT withdrawal detected on {primary.id}, skip withdraw")
         elif  trend == "buy_primary":
             # Transfer coin: primary -> secondary
             if secondary_coin * secondary_bid < REBALANCE_THRESHOLD:
                 transfer_amount = total_coin * REBALANCE_RATIO - secondary_coin
-                if can_withdraw(primary, base_coin) and transfer_amount > 0 and transfer_amount <= primary_coin:
-                    transaction = primary.withdraw(
-                        base_coin,
-                        round(transfer_amount, 4),
-                        SECONDARY_COIN_ADDRESS,
-                        tag=None,
-                        params={"network": COIN_NETWORK},
-                    )
-                    total_fees += primary_fee
-                    is_withdraw = True
-                    message = f"{base_coin}: {primary.id} -> {secondary.id}\nAmount: {transfer_amount:.2f}\nFees: {primary_fee} {base_coin}\nTotal Fees: {total_fees} {base_coin}"
-                    bot.send_message(TelegramSetting.CHAT_ID, message)
-                    print(message)
+                if can_withdraw(primary, base_coin) and transfer_amount > 0:
+                    available_balance = primary_balance.get('amount_coin', {}).get("free", 0)
+                    if available_balance < transfer_amount * 0.9:
+                        message = f"[{primary.id.upper()}] ⚠️ Available balance not enough to withdraw.\n" \
+                                  f"Withdraw Amount: {transfer_amount:.4f} {base_coin}, Available: {available_balance:.4f} {base_coin}"
+                        bot.send_message(TelegramSetting.CHAT_WARNING_ID, message)
+                    else:
+                        withdraw_amount = min(available_balance, transfer_amount)
+                        transaction = primary.withdraw(
+                            base_coin,
+                            round(withdraw_amount, 4),
+                            SECONDARY_COIN_ADDRESS,
+                            tag=None,
+                            params={"network": COIN_NETWORK},
+                        )
+                        total_fees += primary_fee
+                        is_withdraw = True
+                        message = f"{base_coin}: {primary.id} -> {secondary.id}\nAmount: {transfer_amount:.2f}\nFees: {primary_fee} {base_coin}\nTotal Fees: {total_fees} {base_coin}"
+                        bot.send_message(TelegramSetting.CHAT_ID, message)
+                        print(message)
                 else:
                     print(f"Pending Coin withdrawal detected on {primary.id}, skip withdraw")
             # Transfer USDT: secondary -> primary
             transfer_amount = total_usdt * REBALANCE_RATIO - primary_usdt
-            if can_withdraw(secondary, "USDT") and transfer_amount > 0 and transfer_amount <= secondary_usdt:
-                transaction = secondary.withdraw(
-                    "USDT",
-                    round(transfer_amount, 4),
-                    PRIMARY_USDT_ADDRESS,
-                    tag=None,
-                    params={"network": USDT_NETWORK},
-                )
-                is_withdraw = True
-                print(f"USDT withdrawal transaction: {transaction}")
+            if can_withdraw(secondary, "USDT") and transfer_amount > 0:
+                available_balance = secondary_balance.get('amount_usdt', {}).get("free", 0)
+                if available_balance < transfer_amount * 0.9:
+                    message = f"[{secondary.id.upper()}] ⚠️ Available balance not enough to withdraw.\n" \
+                              f"Withdraw Amount: {transfer_amount:.4f} USDT, Available: {available_balance:.4f} USDT"
+                    bot.send_message(TelegramSetting.CHAT_WARNING_ID, message)
+                else:
+                    withdraw_amount = min(available_balance, transfer_amount)
+                    transaction = secondary.withdraw(
+                        "USDT",
+                        round(withdraw_amount, 4),
+                        PRIMARY_USDT_ADDRESS,
+                        tag=None,
+                        params={"network": USDT_NETWORK},
+                    )
+                    is_withdraw = True
+                    print(f"USDT withdrawal transaction: {transaction}")
             else:
                 print(f"Pending USDT withdrawal detected on {secondary.id}, skip withdraw")
         save_trading_data(total_fees=total_fees)
@@ -226,7 +254,7 @@ def can_withdraw(exchange: ccxt.Exchange, currency: str):
         print(f"Warning: fetch_withdrawals not supported on {exchange.id}, {e}")
         return True
 
-def detect_trend(primary_order_book, secondary_order_book):
+def detect_trend(primary_order_book, secondary_order_book, threshold=1.006):
     try:
         primary_bid = primary_order_book["bids"][0][0] if primary_order_book["bids"] else None
         primary_ask = primary_order_book["asks"][0][0] if primary_order_book["asks"] else None
@@ -237,9 +265,9 @@ def detect_trend(primary_order_book, secondary_order_book):
             return None
 
         # Trigger earlier than the strict threshold
-        if primary_bid > secondary_ask:
+        if primary_bid > secondary_ask * threshold:
             return "sell_primary"
-        elif secondary_bid > primary_ask:
+        elif secondary_bid > primary_ask * threshold:
             return "buy_primary"
         else:
             return None

@@ -71,6 +71,7 @@ class TradeEnv:
 
     REBALANCE_RATIO = float(os.getenv("REBALANCE_RATIO", 0.5))
     REBALANCE_THRESHOLD = int(os.getenv("REBALANCE_THRESHOLD",10))
+    TREND_THRESHOLD = float(os.getenv("TREND_THRESHOLD", 1.009)) # for detect trend, smaller than ARBITRAGE_THRESHOLD
 
     PRIMARY_FEE_TAKER = float(os.getenv("PRIMARY_FEE_TAKER", 0.06))
     SECONDARY_FEE_TAKER = float(os.getenv("SECONDARY_FEE_TAKER", 0.06))
