@@ -69,8 +69,10 @@ class TradeEnv:
     COIN_NETWORK = os.getenv("COIN_NETWORK")
     USDT_NETWORK = os.getenv("USDT_NETWORK")
 
-    REBALANCE_RATIO = float(os.getenv("REBALANCE_RATIO", 0.5))
-    REBALANCE_THRESHOLD = int(os.getenv("REBALANCE_THRESHOLD",10))
+    REBALANCE_COIN_RATIO = float(os.getenv("REBALANCE_COIN_RATIO", 0.8))
+    REBALANCE_USDT_RATIO = float(os.getenv("REBALANCE_USDT_RATIO", 0.6))
+    REBALANCE_COIN_THRESHOLD = int(os.getenv("REBALANCE_COIN_THRESHOLD",10)) # usd
+    REBALANCE_USDT_THRESHOLD = int(os.getenv("REBALANCE_USDT_THRESHOLD",100)) # usd
     TREND_THRESHOLD = float(os.getenv("TREND_THRESHOLD", 1.009)) # for detect trend, smaller than ARBITRAGE_THRESHOLD
 
     PRIMARY_FEE_TAKER = float(os.getenv("PRIMARY_FEE_TAKER", 0.06))
