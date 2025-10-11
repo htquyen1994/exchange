@@ -49,6 +49,14 @@ class RebalancingManager:
                           primary_orderbook, secondary_orderbook,
                           primary_balance, secondary_balance,
                           auto_rebalance):
+        if self.should_send_warning():
+            primary_code = primary_ccxt.id
+            secondary_code = secondary_ccxt.id
+            msg = f"Warning exchange {primary_code}/{secondary_code}"
+            msg += f"\n COIN {primary_balance['amount_coin']['total']:.2f} / {secondary_balance['amount_coin']['total']:.2f}"
+            msg += f"\n USDT {primary_balance['amount_usdt']['total']:.2f} / {secondary_balance['amount_usdt']['total']:.2f}"
+            self.bot.send_message(TelegramSetting.CHAT_WARNING_ID, msg)
+            self.last_warning_time = datetime.datetime.now()
         if not self.is_rebalancing:
             try:
                 _is_rebalancing = rebalancing(primary_ccxt, secondary_ccxt, symbol,
@@ -61,14 +69,6 @@ class RebalancingManager:
                 from exchange.util.telegram_utils import send_error_telegram
                 send_error_telegram(ex, "Rebalancing Failed", self.bot)
                 raise
-        if self.should_send_warning():
-            primary_code = primary_ccxt.id
-            secondary_code = secondary_ccxt.id
-            msg = f"Warning exchange {primary_code}/{secondary_code}"
-            msg += f"\n COIN {primary_balance['amount_coin']['total']:.2f} / {secondary_balance['amount_coin']['total']:.2f}"
-            msg += f"\n USDT {primary_balance['amount_usdt']['total']:.2f} / {secondary_balance['amount_usdt']['total']:.2f}"
-            self.bot.send_message(TelegramSetting.CHAT_WARNING_ID, msg)
-            self.last_warning_time = datetime.datetime.now()
     
     def reset_rebalancing_state(self):
         self.is_rebalancing = False
