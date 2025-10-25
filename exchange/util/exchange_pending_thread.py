@@ -77,18 +77,23 @@ class ExchangePendingThread:
                     amount = min(filled_primary, filled_secondary)
                     if is_order_completed(primary_order_status) and is_order_completed(secondary_order_status):
                         profit = calculate_profit(primary_ccxt_manager, primary_transaction.order_id, secondary_ccxt_manager, secondary_transaction.order_id, symbol)
-                        total_profit = total_profit + profit
-                        save_trading_data(total_profit=total_profit)
+                        if profit is not None:
+                            total_profit = total_profit + profit
+                            save_trading_data(total_profit=total_profit)
 
-                        msg = (
-                            f"✅ Trade Completed\n"
-                            f"{primary_exchange_code.upper()} | Side: {side_primary} | Status: {primary_order_status['status']}\n"
-                            f"{secondary_exchange_code.upper()} | Side: {side_secondary} | Status: {secondary_order_status['status']}\n"
-                            f"Amount: {amount}\n"
-                            f"Profit: {profit:.4f}\n"
-                            f"Total Profit: {total_profit:.4f}\n"
-                        )
-                        bot_tele.send_message(TelegramSetting.CHAT_ID, msg)
+                            msg = (
+                                f"✅ Trade Completed\n"
+                                f"{primary_exchange_code.upper()} | Side: {side_primary} | Status: {primary_order_status['status']}\n"
+                                f"{secondary_exchange_code.upper()} | Side: {side_secondary} | Status: {secondary_order_status['status']}\n"
+                                f"Amount: {amount}\n"
+                                f"Profit: {profit:.4f}\n"
+                                f"Total Profit: {total_profit:.4f}\n"
+                            )
+
+                            bot_tele.send_message(TelegramSetting.CHAT_ID, msg)
+                        else:
+                            send_error_telegram(Exception("Cannot calculate profit"), "Trade Completed", bot_tele)
+
                     elif is_order_pending(primary_order_status) and is_order_pending(secondary_order_status):
                             execute_orders_concurrently(
                                 lambda: primary_ccxt_manager.cancel_order(primary_transaction.order_id, symbol),
@@ -129,21 +134,30 @@ class ExchangePendingThread:
 
 def calculate_profit(primary, primary_order_id, secondary, secondary_order_id, symbol):
     def get_summary(exchange, order_id):
-        trades = exchange.fetch_my_trades(symbol)
-        related = [t for t in trades if t.get("order") == order_id]
+        if exchange.has.get('fetchOrderTrades'):
+            related = exchange.fetch_order_trades(order_id, symbol)
+        else:
+            all_trades = exchange.fetch_my_trades(symbol)
+            related = [t for t in all_trades if t.get("order") == order_id]
+
+        if not related:
+            return None, None, None
+
         cost = sum(t["cost"] for t in related)
         fee  = sum(t["fee"]["cost"] for t in related if t.get("fee"))
-        side = related[0]["side"] if related else None
+        side = related[0]["side"]
         return cost, fee, side
 
-    cost_primary, fee_primary, side_primary = get_summary(primary, primary_order_id)
-    cost_secondary, fee_secondary, side_secondary = get_summary(secondary, secondary_order_id)
-    print(f"{cost_primary} {fee_primary} {side_primary}")
-    print(f"{cost_secondary} {fee_secondary} {side_secondary}")
-    if side_primary == "buy":
-        return (cost_secondary - fee_secondary) - (cost_primary + fee_primary)
+    cost_p, fee_p, side_p = get_summary(primary, primary_order_id)
+    cost_s, fee_s, side_s = get_summary(secondary, secondary_order_id)
+
+    if side_p is None or side_s is None:
+        print("Không get được dữ liệu trade, bỏ qua tính profit.")
+        return None
+    if side_p == "buy":
+        return cost_s - cost_p - (fee_s + fee_p)
     else:
-        return (cost_primary - fee_primary) - (cost_secondary + fee_secondary)
+        return cost_p - cost_s - (fee_p + fee_s)
 
 def get_filled_size(exchange_code, order):
     if exchange_code == ExchangesCode.BITMART.value:
