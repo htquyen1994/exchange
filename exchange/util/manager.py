@@ -8,13 +8,12 @@ from exchange.util.ccxt_manager import CcxtManager
 from exchange.util.exchange_pending_thread import ExchangePendingThread
 from exchange.util.exchange_thread import ExchangeThread
 import telebot
-from collections import deque
 from exchange.util.log_agent import LoggerAgent
 from exchange.util.order_executor import execute_orders_concurrently
 from exchange.util.telegram_utils import send_error_telegram
 from exchange.util.ws_orderbook_watcher import WSOrderbookWatcher
 from exchange.util.rebalancing import RebalancingManager
-from types import SimpleNamespace
+from exchange.util.orderbook_tools import maximum_quantity_trade_able
 
 class Manager:
     start_flag = True
@@ -144,7 +143,7 @@ class Manager:
                             primary_ccxt, secondary_ccxt, symbol,
                             primary_orderbook, secondary_orderbook,
                             primary_balance, secondary_balance,
-                            self.rebalance_config
+                            self.rebalance_config, TradeSetting.ARBITRAGE_THRESHOLD
                         )
                     else:
                         rebalance_manager.reset_rebalancing_state()
@@ -287,62 +286,3 @@ def get_balance(ccxt_instance, symbol):
 
 def get_min_notional(exchange_code: str) -> float:
     return ExchangeNotionalSetting.MIN.get(exchange_code.upper(), ExchangeNotionalSetting.MIN["DEFAULT"])
-
-def maximum_quantity_trade_able(buy_order_book, sell_order_book, threshold, max_trade_quantity):
-    """
-    Find the maximum tradable quantity between two order books
-    while satisfying the arbitrage threshold condition.
-
-    Args:
-        buy_order_book: {"asks": deque([(price, quantity), ...])}
-        sell_order_book: {"bids": deque([(price, quantity), ...])}
-        threshold: arbitrage threshold (multiplier)
-        max_trade_quantity: maximum trade quantity
-
-    Returns:
-        {"buy_price": float, "sell_price": float, "quantity": float}
-    """
-    asks = deque([list(x) for x in buy_order_book["asks"]])  # [price, qty]
-    bids = deque([list(x) for x in sell_order_book["bids"]])
-
-    result = {
-        "buy_price": asks[0][0],
-        "sell_price": bids[0][0],
-        "quantity": 0
-    }
-
-    while asks and bids and result["quantity"] < max_trade_quantity:
-        buy_price, buy_quantity = asks[0]
-        sell_price, sell_quantity = bids[0]
-
-        if sell_price <= buy_price * threshold:
-            break
-
-        result["buy_price"] = buy_price
-        result["sell_price"] = sell_price
-
-        remain = max_trade_quantity - result["quantity"]
-
-        if buy_quantity > sell_quantity:
-            trade_qty = min(sell_quantity, remain)
-            asks[0][1] = buy_quantity - trade_qty
-            if trade_qty == sell_quantity:
-                bids.popleft()
-            result["quantity"] += trade_qty
-        elif buy_quantity < sell_quantity:
-            trade_qty = min(buy_quantity, remain)
-            bids[0][1] = sell_quantity - trade_qty
-            if trade_qty == buy_quantity:
-                asks.popleft()
-            result["quantity"] += trade_qty
-        else:
-            trade_qty = min(buy_quantity, remain)
-            if trade_qty == buy_quantity:
-                asks.popleft()
-                bids.popleft()
-            else:
-                asks[0][1] = buy_quantity - trade_qty
-                bids[0][1] = sell_quantity - trade_qty
-            result["quantity"] += trade_qty
-
-    return result

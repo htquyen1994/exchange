@@ -3,7 +3,7 @@ import telebot
 import datetime
 from config.config import TelegramSetting, TradeEnv
 from config.profit_tracker import load_trading_data, save_trading_data
-from exchange.util.order_executor import execute_orders_concurrently
+from exchange.util.orderbook_tools import maximum_quantity_trade_able
 _fee_cache = {}
 
 
@@ -44,7 +44,7 @@ class RebalancingManager:
     def handle_low_balance(self, primary_ccxt, secondary_ccxt, symbol,
                           primary_orderbook, secondary_orderbook,
                           primary_balance, secondary_balance,
-                          rebalance_config):
+                          rebalance_config, arbitrage_threshold):
         if self.should_send_warning():
             primary_code = primary_ccxt.id
             secondary_code = secondary_ccxt.id
@@ -58,7 +58,7 @@ class RebalancingManager:
                 _is_rebalancing = rebalancing(primary_ccxt, secondary_ccxt, symbol,
                           primary_orderbook, secondary_orderbook,
                           primary_balance, secondary_balance,
-                          rebalance_config)
+                          rebalance_config, arbitrage_threshold)
                 self.is_rebalancing = _is_rebalancing
             except Exception as ex:
                 self.is_rebalancing = False
@@ -73,9 +73,9 @@ current_time = datetime.datetime.now()
 def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str, 
                 primary_order_book, secondary_order_book,
                 primary_balance, secondary_balance,
-                rebalance_config):
+                rebalance_config, arbitrage_threshold):
     global current_time
-    if not rebalance_config.auto_rebalance:
+    if not rebalance_config.enabled:
         print("Auto rebalance is OFF")
         return False
     trend = detect_trend(primary_order_book, secondary_order_book, TradeEnv.TREND_THRESHOLD)
@@ -125,6 +125,11 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
                         bot.send_message(TelegramSetting.CHAT_WARNING_ID, message)
                         current_time = datetime.datetime.now()
                 elif transfer_amount > 0:
+                    trade_info = maximum_quantity_trade_able(secondary_order_book, primary_order_book, arbitrage_threshold)
+                    quantity_trade_able = trade_info["quantity"]
+                    if quantity_trade_able > available_balance:
+                        # Nếu lượng có thể trade > lượng coin đang có → chuyển hết luôn
+                        transfer_amount = available_balance
                     transaction = secondary.withdraw(
                         base_coin,
                         round(transfer_amount, 4),
@@ -170,6 +175,11 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
                         bot.send_message(TelegramSetting.CHAT_WARNING_ID, message)
                         current_time = datetime.datetime.now()
                 elif transfer_amount > 0:
+                    trade_info = maximum_quantity_trade_able(primary_order_book, secondary_order_book, arbitrage_threshold)
+                    quantity_trade_able = trade_info["quantity"]
+                    if quantity_trade_able > available_balance:
+                        # Nếu lượng có thể trade > lượng coin đang có → chuyển hết luôn
+                        transfer_amount = available_balance
                     transaction = primary.withdraw(
                         base_coin,
                         round(transfer_amount, 4),
