@@ -13,10 +13,6 @@ SECONDARY_COIN_ADDRESS = TradeEnv.SECONDARY_COIN_ADDRESS
 SECONDARY_USDT_ADDRESS = TradeEnv.SECONDARY_USDT_ADDRESS
 COIN_NETWORK = TradeEnv.COIN_NETWORK
 USDT_NETWORK = TradeEnv.USDT_NETWORK
-REBALANCE_COIN_RATIO = TradeEnv.REBALANCE_COIN_RATIO
-REBALANCE_USDT_RATIO = TradeEnv.REBALANCE_USDT_RATIO
-REBALANCE_COIN_THRESHOLD = TradeEnv.REBALANCE_COIN_THRESHOLD
-REBALANCE_USDT_THRESHOLD = TradeEnv.REBALANCE_USDT_THRESHOLD
 
 class RebalancingManager:
     def __init__(self):
@@ -30,17 +26,17 @@ class RebalancingManager:
         return (datetime.datetime.now() - self.last_warning_time).total_seconds() >= warning_interval_seconds
     
     def check_wallet_conditions(self, primary_balance, secondary_balance, 
-                                primary_buy_price, secondary_buy_price):
+                                primary_buy_price, secondary_buy_price,
+                                rebalance_config):
         primary_usdt = primary_balance.get("amount_usdt", {}).get("total", 0)
         primary_coin = primary_balance.get('amount_coin', {}).get("total", 0)
         secondary_usdt = secondary_balance.get("amount_usdt", {}).get("total", 0)
         secondary_coin = secondary_balance.get('amount_coin', {}).get("total", 0)
-
         wallet_not_enough = (
-            primary_usdt < REBALANCE_USDT_THRESHOLD or 
-            secondary_usdt < REBALANCE_USDT_THRESHOLD or 
-            secondary_coin * secondary_buy_price < REBALANCE_COIN_THRESHOLD or 
-            primary_coin * primary_buy_price < REBALANCE_COIN_THRESHOLD
+            primary_usdt < rebalance_config.usdt_threshold or 
+            secondary_usdt < rebalance_config.usdt_threshold or 
+            secondary_coin * secondary_buy_price < rebalance_config.coin_threshold or 
+            primary_coin * primary_buy_price < rebalance_config.coin_threshold
         )
         
         return wallet_not_enough
@@ -48,7 +44,7 @@ class RebalancingManager:
     def handle_low_balance(self, primary_ccxt, secondary_ccxt, symbol,
                           primary_orderbook, secondary_orderbook,
                           primary_balance, secondary_balance,
-                          auto_rebalance):
+                          rebalance_config):
         if self.should_send_warning():
             primary_code = primary_ccxt.id
             secondary_code = secondary_ccxt.id
@@ -62,7 +58,7 @@ class RebalancingManager:
                 _is_rebalancing = rebalancing(primary_ccxt, secondary_ccxt, symbol,
                           primary_orderbook, secondary_orderbook,
                           primary_balance, secondary_balance,
-                          auto_rebalance)
+                          rebalance_config)
                 self.is_rebalancing = _is_rebalancing
             except Exception as ex:
                 self.is_rebalancing = False
@@ -77,9 +73,9 @@ current_time = datetime.datetime.now()
 def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str, 
                 primary_order_book, secondary_order_book,
                 primary_balance, secondary_balance,
-                auto_rebalance: bool):
+                rebalance_config):
     global current_time
-    if not auto_rebalance:
+    if not rebalance_config.auto_rebalance:
         print("Auto rebalance is OFF")
         return False
     trend = detect_trend(primary_order_book, secondary_order_book, TradeEnv.TREND_THRESHOLD)
@@ -119,8 +115,8 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
 
         if trend == "sell_primary":
             # Transfer coin: secondary -> primary
-            if primary_coin * primary_bid < REBALANCE_COIN_THRESHOLD:
-                transfer_amount = total_coin * REBALANCE_COIN_RATIO - primary_coin
+            if primary_coin * primary_bid < rebalance_config.coin_threshold:
+                transfer_amount = total_coin * rebalance_config.coin_ratio - primary_coin
                 available_balance = secondary_balance.get('amount_coin', {}).get("free", 0)
                 if transfer_amount > available_balance:
                     if (datetime.datetime.now() - current_time).total_seconds() >= 600:
@@ -143,7 +139,7 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
                     print(message)
 
             # Transfer USDT: primary -> secondary
-            transfer_amount = total_usdt * REBALANCE_USDT_RATIO - secondary_usdt
+            transfer_amount = total_usdt * rebalance_config.usdt_ratio - secondary_usdt
             available_balance = primary_balance.get('amount_usdt', {}).get("free", 0)
             if transfer_amount > available_balance:
                 if (datetime.datetime.now() - current_time).total_seconds() >= 600:
@@ -164,8 +160,8 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
 
         elif trend == "buy_primary":
             # Transfer coin: primary -> secondary
-            if secondary_coin * secondary_bid < REBALANCE_COIN_THRESHOLD:
-                transfer_amount = total_coin * REBALANCE_COIN_RATIO - secondary_coin
+            if secondary_coin * secondary_bid < rebalance_config.coin_threshold:
+                transfer_amount = total_coin * rebalance_config.coin_ratio - secondary_coin
                 available_balance = primary_balance.get('amount_coin', {}).get("free", 0)
                 if transfer_amount > available_balance:
                     if (datetime.datetime.now() - current_time).total_seconds() >= 600:
@@ -188,7 +184,7 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
                     print(message)
 
             # Transfer USDT: secondary -> primary
-            transfer_amount = total_usdt * REBALANCE_USDT_RATIO - primary_usdt
+            transfer_amount = total_usdt * rebalance_config.usdt_ratio - primary_usdt
             available_balance = secondary_balance.get('amount_usdt', {}).get("free", 0)
             if transfer_amount > available_balance:
                 if (datetime.datetime.now() - current_time).total_seconds() >= 600:

@@ -80,21 +80,27 @@ class ExchangeLogic:
     @classmethod
     @require_authenticate
     @Util.system_error_handler
-    def rebalance_toggle_post(cls, ToggleRequest):
+    def rebalance_config_post(cls, ConfigRequest):
         try:
-            # body: {"enabled": true/false}
-            if "enabled" not in ToggleRequest:
-                raise ValueError("Missing 'enabled' field")
-
-            enabled = bool(ToggleRequest["enabled"])
-            Manager.get_instance().set_auto_rebalance(enabled)
-
+            required_fields = [
+                "enabled",
+                "usdt_ratio",
+                "coin_ratio",
+                "usdt_threshold",
+                "coin_threshold"
+            ]
+            for field in required_fields:
+                value = getattr(ConfigRequest, field, None)
+                if value is None:
+                    raise ValueError(f"Missing or null '{field}' field")
+                
+            Manager.get_instance().set_rebalance_config(ConfigRequest)
             resp = CommonResponse()
-            resp.message = enabled
+            resp.message = "Rebalance parameters updated successfully"
+            resp.data = vars(ConfigRequest)
             return resp, 200
         except Exception as ex:
-            print("ExchangeLogic.rebalance_toggle_post::{}".format(ex.__str__()))
-
+            print(f"ExchangeLogic.rebalance_config_post::{ex}")
 
     @classmethod
     @require_authenticate
@@ -102,7 +108,15 @@ class ExchangeLogic:
     def rebalance_status_get(cls):
         try:
             resp = CommonResponse()
-            resp.message = Manager.get_instance().get_auto_rebalance()
+            manager = Manager.get_instance()
+            config = manager.get_rebalance_config()
+            resp.message = {
+                "enabled": config.enabled,
+                "usdt_ratio": config.usdt_ratio,
+                "coin_ratio": config.coin_ratio,
+                "usdt_threshold": config.usdt_threshold,
+                "coin_threshold": config.coin_threshold,
+            }
             return resp, 200
         except Exception as ex:
-            print("ExchangeLogic.rebalance_status_get::{}".format(ex.__str__()))
+            print(f"ExchangeLogic.rebalance_status_get::{ex}")

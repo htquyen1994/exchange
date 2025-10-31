@@ -153,20 +153,20 @@ paths:
             $ref: "#/definitions/CommonResponse"
       x-swagger-router-controller: "swagger_server.controllers.ping_controller"
 
-  /rebalance/toggle:
+  /rebalance/config:
     post:
       tags:
       - "Rebalance"
       summary: "Toggle auto rebalance"
       description: "Enable or disable auto rebalance"
-      operationId: "rebalance_toggle_post"
+      operationId: "rebalance_config_post"
       parameters:
       - in: "body"
-        name: "ToggleRequest"
+        name: "ConfigRequest"
         description: "Set auto rebalance true/false"
         required: true
         schema:
-          $ref: "#/definitions/RebalanceToggleRequest"
+          $ref: "#/definitions/RebalanceConfigRequest"
       responses:
         "200":
           description: "Success"
@@ -463,13 +463,34 @@ definitions:
       - "info"
       - "info"
   
-  RebalanceToggleRequest:
+  RebalanceConfigRequest:
     type: object
     required:
       - enabled
+      - usdt_ratio
+      - coin_ratio
+      - usdt_threshold
+      - coin_threshold
     properties:
       enabled:
         type: boolean
+        description: Whether auto-rebalance is enabled
+      usdt_ratio:
+        type: number
+        format: float
+        description: Ratio of USDT to rebalance between exchanges
+      coin_ratio:
+        type: number
+        format: float
+        description: Ratio of coin to rebalance between exchanges
+      usdt_threshold:
+        type: number
+        format: float
+        description: Minimum USDT threshold to trigger rebalance
+      coin_threshold:
+        type: number
+        format: float
+        description: Minimum coin threshold to trigger rebalance
 responses:
   CommonResponse:
     description: "HTTP error code response.\n200=Success\n400=Invalid parameter\n\

@@ -14,6 +14,7 @@ from exchange.util.order_executor import execute_orders_concurrently
 from exchange.util.telegram_utils import send_error_telegram
 from exchange.util.ws_orderbook_watcher import WSOrderbookWatcher
 from exchange.util.rebalancing import RebalancingManager
+from types import SimpleNamespace
 
 class Manager:
     start_flag = True
@@ -39,16 +40,16 @@ class Manager:
         manager = multiprocessing.Manager()
         self.shared_ccxt_manager = manager.Namespace()
         self.shared_ccxt_manager.instance = CcxtManager.get_instance()
-        self.shared_config = manager.Namespace()
-        self.shared_config.auto_rebalance = False
-        # self.ccxt_manager = CcxtManager.get_instance()
-        # self.logger = LoggerAgent.get_instance()
+        self.rebalance_config = manager.Namespace()
     
-    def set_auto_rebalance(self, enable: bool):
-        self.shared_config.auto_rebalance = enable
-
-    def get_auto_rebalance(self) -> bool:
-        return self.shared_config.auto_rebalance
+    def set_rebalance_config(self, config):
+        self.rebalance_config.enabled = bool(config.enabled)
+        self.rebalance_config.usdt_ratio = float(config.usdt_ratio)
+        self.rebalance_config.coin_ratio = float(config.coin_ratio)
+        self.rebalance_config.usdt_threshold = float(config.usdt_threshold)
+        self.rebalance_config.coin_threshold = float(config.coin_threshold)
+    def get_rebalance_config(self):
+        return self.rebalance_config
 
     def get_shared_ccxt_manager(self):
         return self.shared_ccxt_manager
@@ -135,15 +136,15 @@ class Manager:
                     
                     wallet_not_enough = rebalance_manager.check_wallet_conditions(
                         primary_balance, secondary_balance,
-                        primary_buy_price, secondary_buy_price
+                        primary_buy_price, secondary_buy_price,
+                        self.rebalance_config
                     )
-                    
                     if wallet_not_enough:
                         rebalance_manager.handle_low_balance(
                             primary_ccxt, secondary_ccxt, symbol,
                             primary_orderbook, secondary_orderbook,
                             primary_balance, secondary_balance,
-                            self.shared_config.auto_rebalance
+                            self.rebalance_config
                         )
                     else:
                         rebalance_manager.reset_rebalancing_state()
