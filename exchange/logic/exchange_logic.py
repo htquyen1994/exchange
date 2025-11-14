@@ -120,3 +120,38 @@ class ExchangeLogic:
             return resp, 200
         except Exception as ex:
             print(f"ExchangeLogic.rebalance_status_get::{ex}")
+
+    @classmethod
+    @require_authenticate
+    @Util.system_error_handler
+    def trade_strategy_config_post(cls, ConfigRequest):
+        try:
+            required_fields = [
+                "mode"
+            ]
+            for field in required_fields:
+                value = getattr(ConfigRequest, field, None)
+                if value is None:
+                    raise ValueError(f"Missing or null '{field}' field")
+                
+            Manager.get_instance().set_trade_strategy_config(ConfigRequest)
+            resp = CommonResponse()
+            resp.message = "Trade strategy parameters updated successfully"
+            resp.data = vars(ConfigRequest)
+            return resp, 200
+        except Exception as ex:
+            print(f"ExchangeLogic.trade_strategy_config_post::{ex}")
+    @classmethod
+    @require_authenticate
+    @Util.system_error_handler
+    def trade_strategy_config_get(cls):
+        try:
+            resp = CommonResponse()
+            manager = Manager.get_instance()
+            config = manager.get_trade_strategy_config()
+            resp.message = {
+                "mode": config.mode,
+            }
+            return resp, 200
+        except Exception as ex:
+            print(f"ExchangeLogic.trade_strategy_config_get::{ex}")

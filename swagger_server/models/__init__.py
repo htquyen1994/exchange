@@ -20,3 +20,4 @@ from swagger_server.models.login_response import LoginResponse
 from swagger_server.models.ping_response import PingResponse
 from swagger_server.models.user_info import UserInfo
 from swagger_server.models.rebalance_config_request import RebalanceConfigRequest
+from swagger_server.models.trade_strategy_config_request import TradeStrategyConfigRequest
