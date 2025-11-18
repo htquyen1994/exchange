@@ -5,6 +5,8 @@ from exchange.util.trader_agent import TraderAgent
 from swagger_server import app, encoder
 from flask_cors import CORS
 from flask import g
+from exchange.util.debug_threads import patch_threading
+patch_threading()
 
 app.app.json_encoder = encoder.JSONEncoder
 app.add_api('swagger.yaml')
