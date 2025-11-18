@@ -196,6 +196,38 @@ paths:
           schema:
             $ref: "#/definitions/CommonResponse"
       x-swagger-router-controller: "swagger_server.controllers.rebalance_controller"
+
+  /trade_strategy/config:
+    post:
+      tags:
+      - "TradeStrategy"
+      summary: "Update trade strategy config"
+      operationId: "trade_strategy_config_post"
+      parameters:
+      - in: "body"
+        name: "ConfigRequest"
+        required: true
+        schema:
+          $ref: "#/definitions/CommonResponse"
+      responses:
+        "200":
+          description: "Success"
+          schema:
+            $ref: "#/definitions/CommonResponse"
+      x-swagger-router-controller: "swagger_server.controllers.trade_strategy_controller"
+
+    get:
+      tags:
+      - "TradeStrategy"
+      summary: "Get current trade strategy config"
+      operationId: "trade_strategy_config_get"
+      responses:
+        "200":
+          description: "Success"
+          schema:
+            $ref: "#/definitions/CommonResponse"
+      x-swagger-router-controller: "swagger_server.controllers.trade_strategy_controller"
+
 definitions:
   LoginRequest:
     type: "object"
@@ -491,6 +523,7 @@ definitions:
         type: number
         format: float
         description: Minimum coin threshold to trigger rebalance
+  
 responses:
   CommonResponse:
     description: "HTTP error code response.\n200=Success\n400=Invalid parameter\n\
