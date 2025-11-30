@@ -95,10 +95,12 @@ class ExchangePendingThread:
                             send_error_telegram(Exception("Cannot calculate profit"), "Trade Completed", bot_tele)
 
                     elif is_order_pending(primary_order_status) and is_order_pending(secondary_order_status):
-                            execute_orders_concurrently(
-                                lambda: primary_ccxt_manager.cancel_order(primary_transaction.order_id, symbol),
-                                lambda: secondary_ccxt_manager.cancel_order(secondary_transaction.order_id, symbol)
-                            )  
+                            # execute_orders_concurrently(
+                            #     lambda: primary_ccxt_manager.cancel_order(primary_transaction.order_id, symbol),
+                            #     lambda: secondary_ccxt_manager.cancel_order(secondary_transaction.order_id, symbol)
+                            # ) 
+                            primary_ccxt_manager.cancel_order(primary_transaction.order_id, symbol),
+                            secondary_ccxt_manager.cancel_order(secondary_transaction.order_id, symbol)
 
                             msg = (
                                 f"❌ Cancel Orders\n"
