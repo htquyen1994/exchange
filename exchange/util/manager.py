@@ -185,7 +185,8 @@ class Manager:
                                 buy_action = lambda: secondary_ccxt.create_limit_buy_order(symbol, quantity, buy_price),
                                 buy_ccxt = secondary_ccxt,
                                 symbol = symbol,
-                                mode = self.trade_strategy_config.mode
+                                mode = self.trade_strategy_config.mode,
+                                bot = bot
                             )
                             if not primary_order or not secondary_order:
                                 continue
@@ -229,7 +230,8 @@ class Manager:
                                 buy_action = lambda: primary_ccxt.create_limit_buy_order(symbol, quantity, buy_price),
                                 buy_ccxt = primary_ccxt,
                                 symbol = symbol,
-                                mode = self.trade_strategy_config.mode
+                                mode = self.trade_strategy_config.mode,
+                                bot = bot
                             )
                             if not primary_order or not secondary_order:
                                 continue
@@ -310,7 +312,7 @@ def get_balance(ccxt_instance, symbol):
 def get_min_notional(exchange_code: str) -> float:
     return ExchangeNotionalSetting.MIN.get(exchange_code.upper(), ExchangeNotionalSetting.MIN["DEFAULT"])
 
-def handle_dual_order(sell_action, buy_action, sell_ccxt, buy_ccxt, symbol, mode="concurrently"):
+def handle_dual_order(sell_action, buy_action, sell_ccxt, buy_ccxt, symbol, mode="concurrently", bot=None):
     """
     Handle dual exchange orders with selectable execution mode.
     
@@ -320,12 +322,12 @@ def handle_dual_order(sell_action, buy_action, sell_ccxt, buy_ccxt, symbol, mode
         sell_ccxt
         buy_ccxt
         mode (str): "concurrently" | "sell_priority" | "buy_priority" (default="concurrently")
+        bot
     
     Returns:
         tuple: (sell_order, buy_order) or (None, None) if failed
     """
     try:
-        bot = telebot.TeleBot(TelegramSetting.TOKEN)
         if mode == "concurrently":
             sell_order, buy_order = execute_orders_concurrently(
                 sell_action,

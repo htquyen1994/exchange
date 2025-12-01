@@ -128,8 +128,8 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
                     trade_info = maximum_quantity_trade_able(secondary_order_book, primary_order_book, arbitrage_threshold)
                     quantity_trade_able = trade_info["quantity"]
                     if quantity_trade_able > available_balance:
-                        # Nếu lượng có thể trade > lượng coin đang có → chuyển hết luôn
-                        transfer_amount = available_balance
+                        # Nếu lượng có thể trade > lượng coin đang có → chuyển gần hết luôn trừ lại $10
+                        transfer_amount = available_balance - 10 / secondary_bid
                     transaction = secondary.withdraw(
                         base_coin,
                         round(transfer_amount, 4),
@@ -178,8 +178,8 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
                     trade_info = maximum_quantity_trade_able(primary_order_book, secondary_order_book, arbitrage_threshold)
                     quantity_trade_able = trade_info["quantity"]
                     if quantity_trade_able > available_balance:
-                        # Nếu lượng có thể trade > lượng coin đang có → chuyển hết luôn
-                        transfer_amount = available_balance
+                        # Nếu lượng có thể trade > lượng coin đang có → chuyển gần hết luôn trừ lại $10
+                        transfer_amount = available_balance - 10 / primary_bid
                     transaction = primary.withdraw(
                         base_coin,
                         round(transfer_amount, 4),
