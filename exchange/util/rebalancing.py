@@ -144,24 +144,25 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
                     print(message)
 
             # Transfer USDT: primary -> secondary
-            transfer_amount = total_usdt * rebalance_config.usdt_ratio - secondary_usdt
-            available_balance = primary_balance.get('amount_usdt', {}).get("free", 0)
-            if transfer_amount > available_balance:
-                if (datetime.datetime.now() - current_time).total_seconds() >= 600:
-                    message = f"[{primary.id.upper()}] ⚠️ Available balance not enough to withdraw.\n" \
-                          f"Withdraw Amount: {transfer_amount:.4f} USDT, Available: {available_balance:.4f} USDT"
-                    bot.send_message(TelegramSetting.CHAT_WARNING_ID, message)
-                    current_time = datetime.datetime.now()
-            elif transfer_amount > 0:
-                transaction = primary.withdraw(
-                    "USDT",
-                    round(transfer_amount, 4),
-                    SECONDARY_USDT_ADDRESS,
-                    tag=None,
-                    params={"network": USDT_NETWORK},
-                )
-                is_withdraw = True
-                print(f"USDT withdrawal transaction: {transaction}")
+            if secondary_usdt < rebalance_config.usdt_threshold:
+                transfer_amount = total_usdt * rebalance_config.usdt_ratio - secondary_usdt
+                available_balance = primary_balance.get('amount_usdt', {}).get("free", 0)
+                if transfer_amount > available_balance:
+                    if (datetime.datetime.now() - current_time).total_seconds() >= 600:
+                        message = f"[{primary.id.upper()}] ⚠️ Available balance not enough to withdraw.\n" \
+                            f"Withdraw Amount: {transfer_amount:.4f} USDT, Available: {available_balance:.4f} USDT"
+                        bot.send_message(TelegramSetting.CHAT_WARNING_ID, message)
+                        current_time = datetime.datetime.now()
+                elif transfer_amount > 0:
+                    transaction = primary.withdraw(
+                        "USDT",
+                        round(transfer_amount, 4),
+                        SECONDARY_USDT_ADDRESS,
+                        tag=None,
+                        params={"network": USDT_NETWORK},
+                    )
+                    is_withdraw = True
+                    print(f"USDT withdrawal transaction: {transaction}")
 
         elif trend == "buy_primary":
             # Transfer coin: primary -> secondary
@@ -194,24 +195,26 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
                     print(message)
 
             # Transfer USDT: secondary -> primary
-            transfer_amount = total_usdt * rebalance_config.usdt_ratio - primary_usdt
-            available_balance = secondary_balance.get('amount_usdt', {}).get("free", 0)
-            if transfer_amount > available_balance:
-                if (datetime.datetime.now() - current_time).total_seconds() >= 600:
-                    message = f"[{secondary.id.upper()}] ⚠️ Available balance not enough to withdraw.\n" \
-                              f"Withdraw Amount: {transfer_amount:.4f} USDT, Available: {available_balance:.4f} USDT"
-                    bot.send_message(TelegramSetting.CHAT_WARNING_ID, message)
-                    current_time = datetime.datetime.now()
-            elif transfer_amount > 0:
-                transaction = secondary.withdraw(
-                    "USDT",
-                    round(transfer_amount, 4),
-                    PRIMARY_USDT_ADDRESS,
-                    tag=None,
-                    params={"network": USDT_NETWORK},
-                )
-                is_withdraw = True
-                print(f"USDT withdrawal transaction: {transaction}")
+            
+            if primary_usdt < rebalance_config.usdt_threshold:
+                transfer_amount = total_usdt * rebalance_config.usdt_ratio - primary_usdt
+                available_balance = secondary_balance.get('amount_usdt', {}).get("free", 0)
+                if transfer_amount > available_balance:
+                    if (datetime.datetime.now() - current_time).total_seconds() >= 600:
+                        message = f"[{secondary.id.upper()}] ⚠️ Available balance not enough to withdraw.\n" \
+                                f"Withdraw Amount: {transfer_amount:.4f} USDT, Available: {available_balance:.4f} USDT"
+                        bot.send_message(TelegramSetting.CHAT_WARNING_ID, message)
+                        current_time = datetime.datetime.now()
+                elif transfer_amount > 0:
+                    transaction = secondary.withdraw(
+                        "USDT",
+                        round(transfer_amount, 4),
+                        PRIMARY_USDT_ADDRESS,
+                        tag=None,
+                        params={"network": USDT_NETWORK},
+                    )
+                    is_withdraw = True
+                    print(f"USDT withdrawal transaction: {transaction}")
 
         save_trading_data(total_fees=total_fees)
 
