@@ -58,7 +58,8 @@ class RebalancingManager:
                 _is_rebalancing = rebalancing(primary_ccxt, secondary_ccxt, symbol,
                           primary_orderbook, secondary_orderbook,
                           primary_balance, secondary_balance,
-                          rebalance_config, arbitrage_threshold)
+                          rebalance_config, arbitrage_threshold,
+                          self.bot)
                 self.is_rebalancing = _is_rebalancing
             except Exception as ex:
                 self.is_rebalancing = False
@@ -73,7 +74,8 @@ current_time = datetime.datetime.now()
 def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str, 
                 primary_order_book, secondary_order_book,
                 primary_balance, secondary_balance,
-                rebalance_config, arbitrage_threshold):
+                rebalance_config, arbitrage_threshold,
+                bot):
     global current_time
     if not rebalance_config.enabled:
         print("Auto rebalance is OFF")
@@ -95,7 +97,6 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
     ):
         raise ValueError("One or more addresses/networks are not configured")
 
-    bot = telebot.TeleBot(TelegramSetting.TOKEN)
     global _fee_cache
     base_coin = symbol.replace("/USDT", "")
     primary_fee = get_fee(primary, base_coin, COIN_NETWORK)
