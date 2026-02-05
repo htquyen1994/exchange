@@ -179,10 +179,21 @@ class Manager:
                             sleep(0.1)
                             continue
                         else:
+                            sell_action = lambda amount=None: primary_ccxt.create_limit_sell_order(
+                                symbol,
+                                amount or quantity,
+                                sell_price
+                            )
+
+                            buy_action = lambda amount=None: secondary_ccxt.create_limit_buy_order(
+                                symbol,
+                                amount or quantity,
+                                buy_price
+                            )
                             primary_order, secondary_order = handle_dual_order(
-                                sell_action = lambda: primary_ccxt.create_limit_sell_order(symbol, quantity, sell_price),
+                                sell_action = sell_action,
                                 sell_ccxt = primary_ccxt,
-                                buy_action = lambda: secondary_ccxt.create_limit_buy_order(symbol, quantity, buy_price),
+                                buy_action = buy_action,
                                 buy_ccxt = secondary_ccxt,
                                 symbol = symbol,
                                 mode = self.trade_strategy_config.mode,
@@ -224,14 +235,26 @@ class Manager:
                             sleep(0.1)
                             continue
                         else:
+                            sell_action = lambda amount=None: secondary_ccxt.create_limit_sell_order(
+                                symbol,
+                                secondary_ccxt.amount_to_precision(symbol, amount or quantity),
+                                sell_price,
+                            )
+
+                            buy_action = lambda amount=None: primary_ccxt.create_limit_buy_order(
+                                symbol,
+                                primary_ccxt.amount_to_precision(symbol, amount or quantity),
+                                buy_price,
+                            )
+
                             secondary_order, primary_order = handle_dual_order(
-                                sell_action = lambda: secondary_ccxt.create_limit_sell_order(symbol, quantity, sell_price),
-                                sell_ccxt = secondary_ccxt,
-                                buy_action = lambda: primary_ccxt.create_limit_buy_order(symbol, quantity, buy_price),
-                                buy_ccxt = primary_ccxt,
-                                symbol = symbol,
-                                mode = self.trade_strategy_config.mode,
-                                bot = bot
+                                sell_action=sell_action,
+                                sell_ccxt=secondary_ccxt,
+                                buy_action=buy_action,
+                                buy_ccxt=primary_ccxt,
+                                symbol=symbol,
+                                mode=self.trade_strategy_config.mode,
+                                bot=bot,
                             )
                             if not primary_order or not secondary_order:
                                 continue
@@ -329,59 +352,64 @@ def handle_dual_order(sell_action, buy_action, sell_ccxt, buy_ccxt, symbol, mode
     """
     try:
         if mode == "concurrently":
-            sell_order, buy_order = execute_orders_concurrently(
-                sell_action,
-                buy_action
-            )
-            return sell_order, buy_order
+            return execute_orders_concurrently(sell_action, buy_action)
 
-        elif mode == "sell_priority":
+        if mode == "sell_priority":
             sell_order = sell_action()
-            id = sell_order['id']
-            fetch_order_res = sell_ccxt.fetch_order(id, symbol)
-            if not is_order_filled(fetch_order_res):
-                sell_ccxt.cancel_order(id, symbol)
-                print("[handle_dual_order] Sell order not filled — buy order skipped..")
-                bot.send_message(TelegramSetting.CHAT_WARNING_ID, "Sell order not filled — buy order skipped.")
-                return None, None
-            try:
-                buy_order = buy_action()
-            except Exception as buy_ex:
-                print(f"[handle_dual_order] Buy order error: {buy_ex}")
-                return None, None
+            order_id = sell_order["id"]
 
-            return sell_order, buy_order
+            order = sell_ccxt.fetch_order(order_id, symbol)
+            if not is_order_filled(order):
+                sell_ccxt.cancel_order(order_id, symbol)
+                order = sell_ccxt.fetch_order(order_id, symbol)
 
-        elif mode == "buy_priority":
+                filled = get_filled_amount(order)
+                if filled <= 0:
+                    bot and bot.send_message(
+                        TelegramSetting.CHAT_WARNING_ID,
+                        "Sell order not filled — buy skipped",
+                    )
+                    return None, None
+
+                buy_order = buy_action(amount=filled)
+                return order, buy_order
+
             buy_order = buy_action()
-            id = buy_order['id']
-            fetch_order_res = buy_ccxt.fetch_order(id, symbol)
-            if not is_order_filled(fetch_order_res):
-                buy_ccxt.cancel_order(id, symbol)
-                print("[handle_dual_order] Buy order not filled — sell order skipped.")
-                bot.send_message(TelegramSetting.CHAT_WARNING_ID, "Buy order not filled — sell order skipped")
-                return None, None
-
-            try:
-                sell_order = sell_action()
-            except Exception as sell_ex:
-                print(f"[handle_dual_order] Sell order error: {sell_ex}")
-                return None, None
-
             return sell_order, buy_order
 
-        else:
-            print(f"[handle_dual_order] Invalid mode '{mode}', fallback to concurrently.")
-            sell_order, buy_order = execute_orders_concurrently(
-                sell_action,
-                buy_action
-            )
+        if mode == "buy_priority":
+            buy_order = buy_action()
+            order_id = buy_order["id"]
+
+            order = buy_ccxt.fetch_order(order_id, symbol)
+            if not is_order_filled(order):
+                buy_ccxt.cancel_order(order_id, symbol)
+                order = buy_ccxt.fetch_order(order_id, symbol)
+
+                filled = get_filled_amount(order)
+                if filled <= 0:
+                    bot and bot.send_message(
+                        TelegramSetting.CHAT_WARNING_ID,
+                        "Buy order not filled — sell skipped",
+                    )
+                    return None, None
+
+                sell_order = sell_action(amount=filled)
+                return sell_order, order
+
+            sell_order = sell_action()
             return sell_order, buy_order
+
+        print(f"[handle_dual_order] Invalid mode {mode}")
+        return None, None
 
     except Exception as ex:
-        print(f"[handle_dual_order] Unexpected Error: {ex}")
+        print(f"[handle_dual_order] Error: {ex}")
         return None, None
-    
+
+def get_filled_amount(order):
+    return float(order.get("filled", 0) or 0)
+
 def is_order_filled(order_response):
     status = order_response.get('status') or ''
     status = status.lower()
