@@ -503,26 +503,108 @@ definitions:
       - coin_ratio
       - usdt_threshold
       - coin_threshold
+      - primary
+      - secondary
     properties:
       enabled:
         type: boolean
-        description: Whether auto-rebalance is enabled
+
       usdt_ratio:
         type: number
         format: float
-        description: Ratio of USDT to rebalance between exchanges
+
       coin_ratio:
         type: number
         format: float
-        description: Ratio of coin to rebalance between exchanges
+
       usdt_threshold:
         type: number
         format: float
-        description: Minimum USDT threshold to trigger rebalance
+
       coin_threshold:
         type: number
         format: float
-        description: Minimum coin threshold to trigger rebalance
+
+      trend_threshold:
+        type: number
+        format: float
+
+      primary:
+        type: object
+        required:
+          - coin_address
+          - usdt_address
+          - coin_network
+          - usdt_network
+        properties:
+          coin_address:
+            type: string
+          usdt_address:
+            type: string
+          coin_network:
+            type: string
+          usdt_network:
+            type: string
+
+      secondary:
+        type: object
+        required:
+          - coin_address
+          - usdt_address
+          - coin_network
+          - usdt_network
+        properties:
+          coin_address:
+            type: string
+          usdt_address:
+            type: string
+          coin_network:
+            type: string
+          usdt_network:
+            type: string
+
+
+  
+  TradeFeeConfig:
+    type: "object"
+    required:
+      - fee_taker
+      - min_notional
+    properties:
+      fee_taker:
+        type: "number"
+        format: "float"
+        description: "Taker fee rate"
+
+      min_notional:
+        type: "number"
+        format: "float"
+        description: "Minimum notional required"
+
+
+  TelegramBotConfig:
+    type: "object"
+    required:
+      - bot_token
+      - chat_id
+    properties:
+      bot_token:
+        type: "string"
+
+      chat_id:
+        type: "string"
+
+      chat_topic:
+        type: "integer"
+        format: "int32"
+
+      warning_topic:
+        type: "integer"
+        format: "int32"
+
+      error_topic:
+        type: "integer"
+        format: "int32"
   
 responses:
   CommonResponse:

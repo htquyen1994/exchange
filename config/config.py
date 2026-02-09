@@ -1,7 +1,5 @@
-import os
 from enum import Enum
-from dotenv import load_dotenv
-load_dotenv()
+
 
 class AppConfig:
     VERSION = "20200506"
@@ -20,10 +18,6 @@ class TradeSetting:
     SIMULATOR = True
     TIME_GET_ORDER_BOOK = 10
     EXCHANGES = ['binance', 'okex', 'gate', 'houbi', 'bybit', 'kucoin', 'bitget', 'mexc']
-
-    ARBITRAGE_THRESHOLD = float(os.getenv("ARBITRAGE_THRESHOLD"))
-    MAX_TRADE_QUANTITY = int(os.getenv("MAX_TRADE_QUANTITY"))
-
 
 
 class Message(Enum):
@@ -45,33 +39,3 @@ class ExchangesCode(Enum):
     BITGET = 'bitget'
     MEXC = 'mexc'
     BITMART = 'bitmart'
-
-class ExchangeNotionalSetting:
-    """Min notional value required per exchange"""
-    MIN = {
-        "BITMART": 5.0,
-        "MEXC": 1.0,
-        "DEFAULT": 1.0
-    }
-
-class TelegramSetting:
-    TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-    CHAT_ID = os.getenv("CHAT_ID")
-    CHAT_WARNING_ID = os.getenv("CHAT_WARNING_ID")
-    CHAT_ERROR_ID = os.getenv("CHAT_ERROR_ID")
-
-
-class TradeEnv:
-    PRIMARY_COIN_ADDRESS = os.getenv("PRIMARY_COIN_ADDRESS")
-    PRIMARY_USDT_ADDRESS = os.getenv("PRIMARY_USDT_ADDRESS")
-    SECONDARY_COIN_ADDRESS = os.getenv("SECONDARY_COIN_ADDRESS")
-    SECONDARY_USDT_ADDRESS = os.getenv("SECONDARY_USDT_ADDRESS")
-    COIN_NETWORK = os.getenv("COIN_NETWORK")
-    USDT_NETWORK = os.getenv("USDT_NETWORK")
-
-    REBALANCE_COIN_THRESHOLD = int(os.getenv("REBALANCE_COIN_THRESHOLD",10)) # usd
-    REBALANCE_USDT_THRESHOLD = int(os.getenv("REBALANCE_USDT_THRESHOLD",100)) # usd
-    TREND_THRESHOLD = float(os.getenv("TREND_THRESHOLD", 1.009)) # for detect trend, smaller than ARBITRAGE_THRESHOLD
-
-    PRIMARY_FEE_TAKER = float(os.getenv("PRIMARY_FEE_TAKER", 0.06))
-    SECONDARY_FEE_TAKER = float(os.getenv("SECONDARY_FEE_TAKER", 0.06))

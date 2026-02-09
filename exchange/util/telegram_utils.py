@@ -1,11 +1,10 @@
 import traceback
 import datetime
 import time
-from config.config import TelegramSetting
 
 _last_error_sent = {}
 
-def send_error_telegram(ex, context="", bot=None):
+def send_error_telegram(ex, context="", bot=None, chat_id=None, error_topic=None):
     global _last_error_sent
 
     if bot is None:
@@ -32,7 +31,7 @@ Error Message:
 Traceback:
 {tb}"""
 
-        bot.send_message(TelegramSetting.CHAT_ERROR_ID, telegram_msg)
+        bot.send_message(chat_id, telegram_msg, message_thread_id=error_topic)
         _last_error_sent[error_key] = now
 
     except Exception as telegram_ex:

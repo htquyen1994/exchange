@@ -2,19 +2,24 @@ import threading
 import asyncio
 import ccxt.pro as ccxtpro
 
+
 class WSOrderbookWatcher:
     def __init__(self, primary_id, secondary_id, symbol):
-        # Tạo ccxt pro riêng
-        self.primary_ccxt = getattr(ccxtpro, primary_id)()
-        self.secondary_ccxt = getattr(ccxtpro, secondary_id)()
+
+        self.primary_ccxt = getattr(ccxtpro, primary_id)({
+            "enableRateLimit": True,
+            "options": {"defaultType": "spot"}
+        })
+
+        self.secondary_ccxt = getattr(ccxtpro, secondary_id)({
+            "enableRateLimit": True,
+            "options": {"defaultType": "spot"}
+        })
+
         self.symbol = symbol
-
         self.shared_dict = {'primary': None, 'secondary': None}
-        self.update_event = threading.Event()
-        self.start_flag = False
 
-        self.prev_primary = None
-        self.prev_secondary = None
+        self.update_event = threading.Event()
 
         self.loop = asyncio.new_event_loop()
         self.thread = threading.Thread(target=self._start_loop, daemon=True)
@@ -22,29 +27,30 @@ class WSOrderbookWatcher:
 
     def _start_loop(self):
         asyncio.set_event_loop(self.loop)
-        self.loop.run_until_complete(self._watch_loop())
+        self.loop.create_task(self._watch_primary())
+        self.loop.create_task(self._watch_secondary())
         self.loop.run_forever()
 
-    async def _watch_loop(self):
+    async def _watch_primary(self):
+        await self.primary_ccxt.load_markets()
         while True:
             try:
-                primary_task = asyncio.create_task(self.primary_ccxt.watch_order_book(self.symbol))
-                secondary_task = asyncio.create_task(self.secondary_ccxt.watch_order_book(self.symbol))
-                done, pending = await asyncio.wait(
-                    [primary_task, secondary_task],
-                    return_when=asyncio.FIRST_COMPLETED
-                )
-                for task in done:
-                    ob = task.result()
-                    if task == primary_task:
-                        self.shared_dict['primary'] = ob
-                    else:
-                        self.shared_dict['secondary'] = ob
-                for task in pending:
-                    task.cancel()
+                ob = await self.primary_ccxt.watch_order_book(self.symbol)
+                self.shared_dict['primary'] = ob
                 self.update_event.set()
             except Exception as e:
-                print("Watcher error:", e)
+                print("Primary error:", e)
+                await asyncio.sleep(1)
+
+    async def _watch_secondary(self):
+        await self.secondary_ccxt.load_markets()
+        while True:
+            try:
+                ob = await self.secondary_ccxt.watch_order_book(self.symbol)
+                self.shared_dict['secondary'] = ob
+                self.update_event.set()
+            except Exception as e:
+                print("Secondary error:", e)
                 await asyncio.sleep(1)
 
     def wait_update(self, timeout=None):
@@ -56,5 +62,7 @@ class WSOrderbookWatcher:
         return self.shared_dict['primary'], self.shared_dict['secondary']
 
     def stop(self):
+        for task in asyncio.all_tasks(self.loop):
+            task.cancel()
         self.loop.call_soon_threadsafe(self.loop.stop)
         self.thread.join(timeout=1)

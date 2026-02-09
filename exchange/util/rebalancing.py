@@ -1,24 +1,15 @@
-import ccxt
-import telebot
 import datetime
-from config.config import TelegramSetting, TradeEnv
+import ccxt
 from config.profit_tracker import load_trading_data, save_trading_data
 from exchange.util.orderbook_tools import maximum_quantity_trade_able
+
 _fee_cache = {}
 
-
-PRIMARY_COIN_ADDRESS = TradeEnv.PRIMARY_COIN_ADDRESS
-PRIMARY_USDT_ADDRESS = TradeEnv.PRIMARY_USDT_ADDRESS
-SECONDARY_COIN_ADDRESS = TradeEnv.SECONDARY_COIN_ADDRESS
-SECONDARY_USDT_ADDRESS = TradeEnv.SECONDARY_USDT_ADDRESS
-COIN_NETWORK = TradeEnv.COIN_NETWORK
-USDT_NETWORK = TradeEnv.USDT_NETWORK
 
 class RebalancingManager:
     def __init__(self):
         self.is_rebalancing = False
         self.last_warning_time = None
-        self.bot = telebot.TeleBot(TelegramSetting.TOKEN)
 
     def should_send_warning(self, warning_interval_seconds=600):
         if self.last_warning_time is None:
@@ -44,14 +35,15 @@ class RebalancingManager:
     def handle_low_balance(self, primary_ccxt, secondary_ccxt, symbol,
                           primary_orderbook, secondary_orderbook,
                           primary_balance, secondary_balance,
-                          rebalance_config, arbitrage_threshold):
+                          rebalance_config, arbitrage_threshold,
+                          bot, telegram_config):
         if self.should_send_warning():
             primary_code = primary_ccxt.id
             secondary_code = secondary_ccxt.id
             msg = f"Warning exchange {primary_code}/{secondary_code}"
             msg += f"\n COIN {primary_balance['amount_coin']['total']:.2f} / {secondary_balance['amount_coin']['total']:.2f}"
             msg += f"\n USDT {primary_balance['amount_usdt']['total']:.2f} / {secondary_balance['amount_usdt']['total']:.2f}"
-            self.bot.send_message(TelegramSetting.CHAT_WARNING_ID, msg)
+            bot.send_message(telegram_config.chat_id, msg, message_thread_id=telegram_config.warning_topic)
             self.last_warning_time = datetime.datetime.now()
         if not self.is_rebalancing:
             try:
@@ -59,12 +51,12 @@ class RebalancingManager:
                           primary_orderbook, secondary_orderbook,
                           primary_balance, secondary_balance,
                           rebalance_config, arbitrage_threshold,
-                          self.bot)
+                          bot, telegram_config)
                 self.is_rebalancing = _is_rebalancing
             except Exception as ex:
                 self.is_rebalancing = False
                 from exchange.util.telegram_utils import send_error_telegram
-                send_error_telegram(ex, "Rebalancing Failed", self.bot)
+                send_error_telegram(ex, "Rebalancing Failed", bot, telegram_config.chat_id, telegram_config.error_topic)
                 raise
     
     def reset_rebalancing_state(self):
@@ -75,32 +67,23 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
                 primary_order_book, secondary_order_book,
                 primary_balance, secondary_balance,
                 rebalance_config, arbitrage_threshold,
-                bot):
+                bot, telegram_config):
     global current_time
     if not rebalance_config.enabled:
         print("Auto rebalance is OFF")
         return False
-    trend = detect_trend(primary_order_book, secondary_order_book, TradeEnv.TREND_THRESHOLD)
+    trend = detect_trend(primary_order_book, secondary_order_book, rebalance_config.trend_threshold)
     if not trend:
         print("No Trend arbitrage.")
         return False
     trading_data = load_trading_data()
     total_fees = trading_data.get("total_fees", 0)
     is_withdraw = False
-    if (
-        not PRIMARY_COIN_ADDRESS
-        or not SECONDARY_COIN_ADDRESS
-        or not PRIMARY_USDT_ADDRESS
-        or not SECONDARY_USDT_ADDRESS
-        or not COIN_NETWORK
-        or not USDT_NETWORK
-    ):
-        raise ValueError("One or more addresses/networks are not configured")
 
     global _fee_cache
     base_coin = symbol.replace("/USDT", "")
-    primary_fee = get_fee(primary, base_coin, COIN_NETWORK)
-    secondary_fee = get_fee(secondary, base_coin, COIN_NETWORK)
+    primary_fee = get_fee(primary, base_coin, rebalance_config.primary.coin_network)
+    secondary_fee = get_fee(secondary, base_coin, rebalance_config.secondary.coin_network)
         
     try:
         primary_bid = primary_order_book["bids"][0][0] if primary_order_book["bids"] else None
@@ -123,7 +106,7 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
                     if (datetime.datetime.now() - current_time).total_seconds() >= 600:
                         message = f"[{secondary.id.upper()}] ⚠️ Available balance not enough to withdraw.\n" \
                                   f"Withdraw Amount: {transfer_amount:.4f} {base_coin}, Available: {available_balance:.4f} {base_coin}"
-                        bot.send_message(TelegramSetting.CHAT_WARNING_ID, message)
+                        bot.send_message(telegram_config.chat_id, message, message_thread_id=telegram_config.warning_topic)
                         current_time = datetime.datetime.now()
                 elif transfer_amount > 0:
                     trade_info = maximum_quantity_trade_able(secondary_order_book, primary_order_book, arbitrage_threshold)
@@ -134,14 +117,14 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
                     transaction = secondary.withdraw(
                         base_coin,
                         round(transfer_amount, 4),
-                        PRIMARY_COIN_ADDRESS,
+                        rebalance_config.primary.coin_address,
                         tag=None,
-                        params={"network": COIN_NETWORK},
+                        params={"network": rebalance_config.secondary.coin_network},
                     )
                     total_fees += secondary_fee
                     is_withdraw = True
                     message = f"{base_coin}: {secondary.id} -> {primary.id}\nAmount: {transfer_amount:.4f}\nFees: {secondary_fee} {base_coin}\nTotal Fees: {total_fees} {base_coin}"
-                    bot.send_message(TelegramSetting.CHAT_WARNING_ID, message)
+                    bot.send_message(telegram_config.chat_id, message, message_thread_id=telegram_config.warning_topic)
                     print(message)
 
             # Transfer USDT: primary -> secondary
@@ -152,15 +135,15 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
                     if (datetime.datetime.now() - current_time).total_seconds() >= 600:
                         message = f"[{primary.id.upper()}] ⚠️ Available balance not enough to withdraw.\n" \
                             f"Withdraw Amount: {transfer_amount:.4f} USDT, Available: {available_balance:.4f} USDT"
-                        bot.send_message(TelegramSetting.CHAT_WARNING_ID, message)
+                        bot.send_message(telegram_config.chat_id, message, message_thread_id=telegram_config.warning_topic)
                         current_time = datetime.datetime.now()
                 elif transfer_amount > 0:
                     transaction = primary.withdraw(
                         "USDT",
                         round(transfer_amount, 4),
-                        SECONDARY_USDT_ADDRESS,
+                        rebalance_config.secondary.usdt_address,
                         tag=None,
-                        params={"network": USDT_NETWORK},
+                        params={"network": rebalance_config.primary.usdt_network},
                     )
                     is_withdraw = True
                     print(f"USDT withdrawal transaction: {transaction}")
@@ -174,7 +157,7 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
                     if (datetime.datetime.now() - current_time).total_seconds() >= 600:
                         message = f"[{primary.id.upper()}] ⚠️ Available balance not enough to withdraw.\n" \
                                   f"Withdraw Amount: {transfer_amount:.4f} {base_coin}, Available: {available_balance:.4f} {base_coin}"
-                        bot.send_message(TelegramSetting.CHAT_WARNING_ID, message)
+                        bot.send_message(telegram_config.chat_id, message, message_thread_id=telegram_config.warning_topic)
                         current_time = datetime.datetime.now()
                 elif transfer_amount > 0:
                     trade_info = maximum_quantity_trade_able(primary_order_book, secondary_order_book, arbitrage_threshold)
@@ -185,14 +168,14 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
                     transaction = primary.withdraw(
                         base_coin,
                         round(transfer_amount, 4),
-                        SECONDARY_COIN_ADDRESS,
+                        rebalance_config.secondary.coin_address,
                         tag=None,
-                        params={"network": COIN_NETWORK},
+                        params={"network": rebalance_config.primary.coin_network},
                     )
                     total_fees += primary_fee
                     is_withdraw = True
                     message = f"{base_coin}: {primary.id} -> {secondary.id}\nAmount: {transfer_amount:.2f}\nFees: {primary_fee} {base_coin}\nTotal Fees: {total_fees} {base_coin}"
-                    bot.send_message(TelegramSetting.CHAT_WARNING_ID, message)
+                    bot.send_message(telegram_config.chat_id, message, message_thread_id=telegram_config.warning_topic)
                     print(message)
 
             # Transfer USDT: secondary -> primary
@@ -204,15 +187,15 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
                     if (datetime.datetime.now() - current_time).total_seconds() >= 600:
                         message = f"[{secondary.id.upper()}] ⚠️ Available balance not enough to withdraw.\n" \
                                 f"Withdraw Amount: {transfer_amount:.4f} USDT, Available: {available_balance:.4f} USDT"
-                        bot.send_message(TelegramSetting.CHAT_WARNING_ID, message)
+                        bot.send_message(telegram_config.chat_id, message, message_thread_id=telegram_config.warning_topic)
                         current_time = datetime.datetime.now()
                 elif transfer_amount > 0:
                     transaction = secondary.withdraw(
                         "USDT",
                         round(transfer_amount, 4),
-                        PRIMARY_USDT_ADDRESS,
+                        rebalance_config.primary.usdt_address,
                         tag=None,
-                        params={"network": USDT_NETWORK},
+                        params={"network": rebalance_config.secondary.usdt_network},
                     )
                     is_withdraw = True
                     print(f"USDT withdrawal transaction: {transaction}")

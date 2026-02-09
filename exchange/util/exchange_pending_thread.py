@@ -2,7 +2,7 @@ from threading import Thread
 from time import sleep
 from time import gmtime, strftime
 from exchange.util.order_executor import execute_orders_concurrently
-from config.config import ExchangesCode, TelegramSetting
+from config.config import ExchangesCode
 from exchange.util.ccxt_manager import CcxtManager
 from exchange.util.telegram_utils import send_error_telegram
 from config.profit_tracker import load_trading_data, save_trading_data
@@ -23,10 +23,10 @@ class ExchangePendingThread:
         self.__ccxt_manager = CcxtManager.get_instance()
         self.__queue = queue
 
-    def start_job(self, shared_ccxt_manager, bot_tele):
+    def start_job(self, shared_ccxt_manager, bot_tele, telegram_config):
         if not self.is_running:
             self.is_running = True
-            self.thread = Thread(target=self.job_function, args=(self.__queue, shared_ccxt_manager, bot_tele))
+            self.thread = Thread(target=self.job_function, args=(self.__queue, shared_ccxt_manager, bot_tele, telegram_config))
             self.thread.start()
             print("------------------ START THREAD (ExchangePendingThread)------------------ ")
         else:
@@ -37,7 +37,7 @@ class ExchangePendingThread:
             self.is_running = False
             self.thread.join()
 
-    def job_function(self, q, shared_ccxt_manager, bot_tele):
+    def job_function(self, q, shared_ccxt_manager, bot_tele, telegram_config):
         trading_data = load_trading_data()
         total_profit = trading_data.get("total_profit", 0)    
         while self.is_running:
@@ -90,9 +90,9 @@ class ExchangePendingThread:
                                 f"Total Profit: {total_profit:.4f}\n"
                             )
 
-                            bot_tele.send_message(TelegramSetting.CHAT_ID, msg)
+                            bot_tele.send_message(telegram_config.chat_id, msg, message_thread_id=telegram_config.chat_topic)
                         else:
-                            send_error_telegram(Exception("Cannot calculate profit"), "Trade Completed", bot_tele)
+                            send_error_telegram(Exception("Cannot calculate profit"), "Trade Completed", bot_tele, telegram_config.chat_id, telegram_config.error_topic)
 
                     elif is_order_pending(primary_order_status) and is_order_pending(secondary_order_status):
                             execute_orders_concurrently(
@@ -108,7 +108,7 @@ class ExchangePendingThread:
                                 f"Total: {secondary_transaction.total}\n"
                                 f"Total Profit: {total_profit:.4f}\n"
                             )
-                            bot_tele.send_message(TelegramSetting.CHAT_ID, msg)
+                            bot_tele.send_message(telegram_config.chat_id, msg, message_thread_id=telegram_config.chat_topic)
 
                     elif is_order_pending(primary_order_status) ^  is_order_pending(secondary_order_status):
                         profit = abs(round(amount * price_primary - amount * price_secondary, 4))
@@ -121,7 +121,7 @@ class ExchangePendingThread:
                             f"Total Profit: {total_profit:.4f}\n"
                         )
                         if not order_transaction.get('pending_sent', False):
-                            bot_tele.send_message(TelegramSetting.CHAT_ID, msg)
+                            bot_tele.send_message(telegram_config.chat_id, msg, message_thread_id=telegram_config.chat_topic)
                             order_transaction['pending_sent'] = True
                         q.put(order_transaction)
                 else:
@@ -130,7 +130,7 @@ class ExchangePendingThread:
             except Exception as ex:
                 sleep(1)
                 print("ExchangePendingThread.job_function::{}".format(ex.__str__()))
-                send_error_telegram(ex, "Main Trading Loop", bot_tele)
+                send_error_telegram(ex, "Main Trading Loop", bot_tele, telegram_config.chat_id, telegram_config.error_topic)
 
 def calculate_profit(primary, primary_order_id, secondary, secondary_order_id, symbol):
     def get_summary(exchange, order_id):

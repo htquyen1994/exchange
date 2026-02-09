@@ -3,40 +3,35 @@ import ccxt
 from config.config import ExchangesCode
 
 
-def init_cctx_exchange(exchange):
-    ccxt_exchange = None
+def init_ccxt_exchange(exchange):
     exchange_code = exchange.exchange_code
-    param = {'apiKey': exchange.private_key, 'secret': exchange.secret_key}
-    if exchange_code == ExchangesCode.BINANCE.value:
-        ccxt_exchange = ccxt.binance(param)
-    elif exchange_code == ExchangesCode.OKEX.value:
+    param = {
+        'apiKey': exchange.private_key,
+        'secret': exchange.secret_key,
+    }
+
+    if exchange_code == ExchangesCode.OKEX.value:
         param['password'] = exchange.password
-        ccxt_exchange = ccxt.okx(param)
+
+    elif exchange_code == ExchangesCode.BITGET.value:
+        param['password'] = exchange.password
+
+    elif exchange_code == ExchangesCode.BITMART.value:
+        param['uid'] = 'exchange-tool'
+        param['options'] = {
+            'createMarketBuyOrderRequiresPrice': False
+        }
+
     elif exchange_code == ExchangesCode.GATE.value:
         param['options'] = {
             'createMarketBuyOrderRequiresPrice': False
         }
-        ccxt_exchange = ccxt.gate(param)
-    elif exchange_code == ExchangesCode.HOUBI.value:
-        ccxt_exchange = ccxt.huobi(param)
-    elif exchange_code == ExchangesCode.BYBIT.value:
-        ccxt_exchange = ccxt.bybit(param)
-    elif exchange_code == ExchangesCode.KUCOIN.value:
-        ccxt_exchange = ccxt.kucoin(param)
-    elif exchange_code == ExchangesCode.BITGET.value:
-        param['password'] = exchange.password
-        ccxt_exchange = ccxt.bitget(param)
-    elif exchange_code == ExchangesCode.MEXC.value:
-        ccxt_exchange = ccxt.mexc(param)
-    elif exchange_code == ExchangesCode.BITMART.value:
-        param['uid'] = 'exhange-tool'
-        param['options'] = {
-            'createMarketBuyOrderRequiresPrice': False
-        }
-        ccxt_exchange = ccxt.bitmart(param)
-    elif exchange_code == ExchangesCode.BINGX.value:
-        ccxt_exchange = ccxt.bingx(param)
-    return ccxt_exchange
+
+    if exchange_code in ccxt.exchanges:
+        exchange_class = getattr(ccxt, exchange_code)
+        return exchange_class(param)
+
+    raise ValueError(f"Exchange '{exchange_code}' is not supported by ccxt")
 
 
 class CcxtManager:
@@ -58,20 +53,18 @@ class CcxtManager:
             CcxtManager.__instance = CcxtManager()
         return CcxtManager.__instance
 
-    def set_configure(self, primary_info, secondary_info, coin, limit, simulator):
+    def set_configure(self, primary_info, secondary_info, coin):
         self.set_primary_exchange(primary_info)
         self.set_secondary_exchange(secondary_info)
         self.__coin_trade = coin
-        self.__limit = limit
-        self.__simulator = simulator
 
     def set_primary_exchange(self, exchange_info):
         self.__primary_exchange = exchange_info
-        self.__ccxt_primary = init_cctx_exchange(exchange_info)
+        self.__ccxt_primary = init_ccxt_exchange(exchange_info)
 
     def set_secondary_exchange(self, exchange_info):
         self.__secondary_exchange = exchange_info
-        self.__ccxt_secondary = init_cctx_exchange(exchange_info)
+        self.__ccxt_secondary = init_ccxt_exchange(exchange_info)
 
     def get_exchange(self, is_primary):
         if is_primary:
