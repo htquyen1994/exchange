@@ -13,6 +13,7 @@ from exchange.util.telegram_utils import send_error_telegram
 from exchange.util.ws_orderbook_watcher import WSOrderbookWatcher
 from exchange.util.rebalancing import RebalancingManager
 from exchange.util.orderbook_tools import maximum_quantity_trade_able
+import time
 
 class Manager:
     start_flag = True
@@ -212,7 +213,6 @@ class Manager:
                         )
                     else:
                         rebalance_manager.reset_rebalancing_state()
-
                     # mua sàn secondary - bán sàn primary
                     if primary_sell_price > self.runtime_config.arbitrage_threshold * secondary_buy_price:
                         trade_info = maximum_quantity_trade_able(secondary_orderbook, primary_orderbook, self.runtime_config.arbitrage_threshold, self.runtime_config.max_trade_quantity)
@@ -249,6 +249,7 @@ class Manager:
                                 buy_action = buy_action,
                                 buy_ccxt = secondary_ccxt,
                                 symbol = symbol,
+                                quantity=quantity,
                                 mode = self.trade_strategy_config.mode,
                                 bot = bot,
                                 telegram_config = self.telegram_config
@@ -307,6 +308,7 @@ class Manager:
                                 buy_action=buy_action,
                                 buy_ccxt=primary_ccxt,
                                 symbol=symbol,
+                                quantity=quantity,
                                 mode=self.trade_strategy_config.mode,
                                 bot=bot,
                                 telegram_config = self.telegram_config
@@ -387,22 +389,17 @@ def get_balance(ccxt_instance, symbol):
 
     return result
 
-def handle_dual_order(sell_action, buy_action, sell_ccxt, buy_ccxt, symbol, mode="concurrently", bot=None, telegram_config=None):
-    """
-    Handle dual exchange orders with selectable execution mode.
-    
-    Args:
-        sell_action (callable): lambda to execute SELL order
-        buy_action (callable): lambda to execute BUY order
-        sell_ccxt
-        buy_ccxt
-        mode (str): "concurrently" | "sell_priority" | "buy_priority" (default="concurrently")
-        bot
-        telegram_config
-    
-    Returns:
-        tuple: (sell_order, buy_order) or (None, None) if failed
-    """
+def handle_dual_order(
+    sell_action,
+    buy_action,
+    sell_ccxt,
+    buy_ccxt,
+    symbol,
+    quantity,
+    mode="concurrently",
+    bot=None,
+    telegram_config=None,
+):
     try:
         if mode == "concurrently":
             return execute_orders_concurrently(sell_action, buy_action)
@@ -411,62 +408,89 @@ def handle_dual_order(sell_action, buy_action, sell_ccxt, buy_ccxt, symbol, mode
             sell_order = sell_action()
             order_id = sell_order["id"]
 
-            order = sell_ccxt.fetch_order(order_id, symbol)
-            if not is_order_filled(order):
-                sell_ccxt.cancel_order(order_id, symbol)
+            for _ in range(2):
                 order = sell_ccxt.fetch_order(order_id, symbol)
-
                 filled = get_filled_amount(order)
-                if filled <= 0:
-                    bot and bot.send_message(
-                        telegram_config.chat_id,
-                        "Sell order not filled — buy skipped",
-                        message_thread_id=telegram_config.warning_topic
-                    )
-                    return None, None
 
-                buy_order = buy_action(amount=filled)
+                if filled > 0:
+                    break
+
+                time.sleep(0.3)
+
+            filled = get_filled_amount(order)
+
+            if filled >= quantity:
+                print(f"[ARB] SELL fully filled {filled}/{quantity}")
+                buy_order = buy_action()
                 return order, buy_order
 
-            buy_order = buy_action()
-            return sell_order, buy_order
+            print(f"[ARB] SELL filled {filled}/{quantity} → cancel")
+
+            try:
+                sell_ccxt.cancel_order(order_id, symbol)
+            except Exception as e:
+                print(f"[ARB] Cancel error → assume FULL fill: {e}")
+                buy_order = buy_action(quantity)
+                return order, buy_order
+
+            final_order = sell_ccxt.fetch_order(order_id, symbol)
+            final_filled = get_filled_amount(final_order)
+
+            print(f"[ARB] SELL final filled {final_filled}/{quantity}")
+
+            if final_filled > 0:
+                buy_order = buy_action(final_filled)
+                return final_order, buy_order
+
+            return None, None
 
         if mode == "buy_priority":
             buy_order = buy_action()
             order_id = buy_order["id"]
 
-            order = buy_ccxt.fetch_order(order_id, symbol)
-            if not is_order_filled(order):
-                buy_ccxt.cancel_order(order_id, symbol)
+            for _ in range(2):
                 order = buy_ccxt.fetch_order(order_id, symbol)
-
                 filled = get_filled_amount(order)
-                if filled <= 0:
-                    bot and bot.send_message(
-                        telegram_config.chat_id,
-                        "Buy order not filled — sell skipped",
-                        message_thread_id=telegram_config.warning_topic
-                    )
-                    return None, None
 
-                sell_order = sell_action(amount=filled)
+                if filled > 0:
+                    break
+
+                time.sleep(0.3)
+
+            filled = get_filled_amount(order)
+
+            if filled >= quantity:
+                print(f"[ARB] BUY fully filled {filled}/{quantity}")
+                sell_order = sell_action()
                 return sell_order, order
 
-            sell_order = sell_action()
-            return sell_order, buy_order
+            print(f"[ARB] BUY filled {filled}/{quantity} → cancel")
+
+            try:
+                buy_ccxt.cancel_order(order_id, symbol)
+            except Exception as e:
+                print(f"[ARB] Cancel error → assume FULL fill: {e}")
+                sell_order = sell_action(quantity)
+                return sell_order, order
+
+            # fetch lại sau cancel
+            final_order = buy_ccxt.fetch_order(order_id, symbol)
+            final_filled = get_filled_amount(final_order)
+
+            print(f"[ARB] BUY final filled {final_filled}/{quantity}")
+
+            if final_filled > 0:
+                sell_order = sell_action(final_filled)
+                return sell_order, final_order
+
+            return None, None
 
         print(f"[handle_dual_order] Invalid mode {mode}")
         return None, None
 
     except Exception as ex:
-        print(f"[handle_dual_order] Error: {ex}")
+        print(f"[handle_dual_order] Fatal Error: {ex}")
         return None, None
 
 def get_filled_amount(order):
     return float(order.get("filled", 0) or 0)
-
-def is_order_filled(order_response):
-    status = order_response.get('status') or ''
-    status = status.lower()
-    return status in ['closed', 'filled', "partially_filled"]
-
