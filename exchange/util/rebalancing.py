@@ -74,7 +74,6 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
         return False
     trend = detect_trend(primary_order_book, secondary_order_book, rebalance_config.trend_threshold)
     if not trend:
-        print("No Trend arbitrage.")
         return False
     trading_data = load_trading_data()
     total_fees = trading_data.get("total_fees", 0)
