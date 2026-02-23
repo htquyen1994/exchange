@@ -15,7 +15,7 @@ class ExchangeRequest(Model):
     Do not edit the class manually.
     """
 
-    def __init__(self, exchange_code: str=None, private_key: str=None, secret_key: str=None, password: str=None):  # noqa: E501
+    def __init__(self, exchange_code: str=None, private_key: str=None, secret_key: str=None, password: str=None, uid: str = None, options: dict = None):  # noqa: E501
         """ExchangeRequest - a model defined in Swagger
 
         :param exchange_code: The exchange_code of this ExchangeRequest.  # noqa: E501
@@ -31,20 +31,26 @@ class ExchangeRequest(Model):
             'exchange_code': str,
             'private_key': str,
             'secret_key': str,
-            'password': str
+            'password': str,
+            'uid': str,
+            'options': dict,
         }
 
         self.attribute_map = {
             'exchange_code': 'exchange_code',
             'private_key': 'private_key',
             'secret_key': 'secret_key',
-            'password': 'password'
+            'password': 'password',
+            'uid': 'uid',
+            'options': 'options'
         }
 
         self._exchange_code = exchange_code
         self._private_key = private_key
         self._secret_key = secret_key
         self._password = password
+        self._uid = uid
+        self._options = options or {}
 
     @classmethod
     def from_dict(cls, dikt) -> 'ExchangeRequest':
@@ -148,3 +154,49 @@ class ExchangeRequest(Model):
         """
 
         self._password = password
+
+    @property
+    def uid(self) -> str:
+        """Gets the uid of this ExchangeRequest.
+
+        uid  # noqa: E501
+
+        :return: The uid of this ExchangeRequest.
+        :rtype: str
+        """
+        return self._uid
+
+    @uid.setter
+    def uid(self, uid: str):
+        """Sets the uid of this ExchangeRequest.
+
+        uid  # noqa: E501
+
+        :param uid: The uid of this ExchangeRequest.
+        :type uid: str
+        """
+
+        self._uid = uid
+    
+    @property
+    def options(self) -> dict:
+        """Gets the options of this ExchangeRequest.
+
+        options  # noqa: E501
+
+        :return: The options of this ExchangeRequest.
+        :rtype: dict
+        """
+        return self._options
+    
+    @options.setter
+    def options(self, options: dict):
+        """Sets the options of this ExchangeRequest.
+
+        options  # noqa: E501
+
+        :param options: The options of this ExchangeRequest.
+        :type options: dict
+        """
+
+        self._options = options

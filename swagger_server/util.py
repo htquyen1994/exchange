@@ -28,9 +28,10 @@ def _deserialize(data, klass):
             return _deserialize_list(data, klass.__args__[0])
         if klass.__origin__ == dict:
             return _deserialize_dict(data, klass.__args__[1])
-    else:
+    elif isinstance(klass, type) and hasattr(klass, "swagger_types"):
         return deserialize_model(data, klass)
-
+    else:
+        return data
 
 def _deserialize_primitive(data, klass):
     """Deserializes to primitive type.
@@ -100,7 +101,7 @@ def deserialize_model(data, klass):
     """
     instance = klass()
 
-    if not instance.swagger_types:
+    if not hasattr(instance, "swagger_types") or not instance.swagger_types:
         return data
 
     for attr, attr_type in six.iteritems(instance.swagger_types):

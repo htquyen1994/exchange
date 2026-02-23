@@ -357,6 +357,13 @@ definitions:
       password:
         type: "string"
         description: "password"
+      uid:
+        type: string
+        description: uid
+      option:
+        type: object
+        additionalProperties: true
+        description: optional params
     example:
       code: "okx"
       private_key: "abc"

@@ -14,6 +14,7 @@ from exchange.util.ws_orderbook_watcher import WSOrderbookWatcher
 from exchange.util.rebalancing import RebalancingManager
 from exchange.util.orderbook_tools import maximum_quantity_trade_able
 import time
+import traceback
 
 class Manager:
     start_flag = True
@@ -490,7 +491,27 @@ def handle_dual_order(
 
     except Exception as ex:
         print(f"[handle_dual_order] Fatal Error: {ex}")
+        send_telegram_error_once(symbol, ex, bot, telegram_config)
         return None, None
 
 def get_filled_amount(order):
     return float(order.get("filled", 0) or 0)
+
+_last_telegram_dual_order_time = {}
+def send_telegram_error_once(
+    symbol: str, ex: Exception, bot=None, telegram_config=None, cooldown: int = 300
+):
+    global _last_telegram_dual_order_time
+    now = datetime.datetime.now().timestamp()
+    last_time = _last_telegram_dual_order_time.get(symbol, 0)
+
+    if bot and telegram_config and now - last_time >= cooldown:
+        error_msg = f"{ex}\n\nTraceback:\n{traceback.format_exc()}"
+        send_error_telegram(
+            error_msg,
+            f"handle_dual_order ({symbol})",
+            bot,
+            telegram_config.chat_id,
+            telegram_config.error_topic,
+        )
+        _last_telegram_dual_order_time[symbol] = now

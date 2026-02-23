@@ -10,22 +10,14 @@ def init_ccxt_exchange(exchange):
         'secret': exchange.secret_key,
     }
 
-    if exchange_code == ExchangesCode.OKEX.value:
+    if getattr(exchange, "password", None):
         param['password'] = exchange.password
 
-    elif exchange_code == ExchangesCode.BITGET.value:
-        param['password'] = exchange.password
+    if getattr(exchange, "uid", None):
+        param['uid'] = exchange.uid
 
-    elif exchange_code == ExchangesCode.BITMART.value:
-        param['uid'] = 'exchange-tool'
-        param['options'] = {
-            'createMarketBuyOrderRequiresPrice': False
-        }
-
-    elif exchange_code == ExchangesCode.GATE.value:
-        param['options'] = {
-            'createMarketBuyOrderRequiresPrice': False
-        }
+    if getattr(exchange, "options", None):
+        param['options'] = exchange.options
 
     if exchange_code in ccxt.exchanges:
         exchange_class = getattr(ccxt, exchange_code)
