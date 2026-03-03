@@ -144,7 +144,13 @@ def calculate_profit(primary, primary_order_id, secondary, secondary_order_id, s
             return None, None, None
 
         cost = sum(t["cost"] for t in related)
-        fee  = sum(t["fee"]["cost"] for t in related if t.get("fee"))
+        base, quote = symbol.split("/")
+        fee = sum(
+            t["fee"]["cost"] if t["fee"]["currency"] == quote
+            else t["fee"]["cost"] * t["price"]
+            for t in related
+            if t.get("fee")
+        )
         side = related[0]["side"]
         return cost, fee, side
 
