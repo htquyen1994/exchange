@@ -95,7 +95,10 @@ def rebalancing(primary: ccxt.Exchange, secondary: ccxt.Exchange, symbol: str,
 
         total_usdt = primary_usdt + secondary_usdt
         total_coin = primary_coin + secondary_coin
-
+        print(f"Trend {trend}")
+        print(f"primary usdt: {primary_usdt}, secondary usdt: {secondary_usdt}")
+        print(f"primary coin: {primary_coin}, secondary coin: {secondary_coin}")
+        print(f"primary bid: {primary_bid}, secondary bid: {secondary_bid}")
         if trend == "sell_primary":
             # Transfer coin: secondary -> primary
             if primary_coin * primary_bid < rebalance_config.coin_threshold:
